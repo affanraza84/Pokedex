@@ -10,7 +10,7 @@ import { PokemonSelectors } from './features/pokedex/store/pokemon.selectors';
   imports: [RouterOutlet, NavbarComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
-  styleUrl: './app.css'
+  styleUrl: './app.scss'
 })
 export class App {
   private readonly pokemonSelectors = inject(PokemonSelectors);

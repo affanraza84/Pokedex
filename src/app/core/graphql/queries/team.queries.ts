@@ -31,3 +31,4 @@ export const DELETE_TEAM_MUTATION = `
     }
   }
 `;
+

@@ -140,3 +140,4 @@ export class TeamChipsComponent {
   public readonly members = input<TeamMember[]>([]);
   public readonly remove = output<number>();
 }
+

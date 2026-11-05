@@ -396,3 +396,4 @@ export class PokemonTableComponent {
     this.pageSizeChange.emit(val);
   }
 }
+

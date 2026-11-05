@@ -326,3 +326,4 @@ export const POKEMON_TYPES = [
   'steel',
   'fairy'
 ];
+

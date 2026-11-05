@@ -200,3 +200,4 @@ export class PokedexComponent {
     this.store.reload();
   }
 }
+

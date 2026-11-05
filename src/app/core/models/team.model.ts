@@ -33,3 +33,4 @@ export interface GraphQLResponse<T> {
     path?: string[];
   }>;
 }
+

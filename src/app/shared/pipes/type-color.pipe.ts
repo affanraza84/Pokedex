@@ -34,3 +34,4 @@ export class TypeColorPipe implements PipeTransform {
     return TYPE_COLORS[key] ?? { bg: '#6c757d', text: '#FFFFFF' };
   }
 }
+

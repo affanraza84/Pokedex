@@ -106,3 +106,4 @@ export class ToastComponent {
   public readonly toast = input<ToastMessage | null>(null);
   public readonly closed = output<void>();
 }
+

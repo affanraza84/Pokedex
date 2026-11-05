@@ -159,3 +159,4 @@ export class PokemonFilterComponent {
   public readonly typeChange = output<string>();
   public readonly resetFilters = output<void>();
 }
+

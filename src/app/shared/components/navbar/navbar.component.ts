@@ -164,3 +164,4 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 export class NavbarComponent {
   public readonly isFallback = input<boolean>(false);
 }
+

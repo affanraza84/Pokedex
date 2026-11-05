@@ -54,3 +54,4 @@ export interface TypeDistributionItem {
   count: number;
   percentage: number;
 }
+

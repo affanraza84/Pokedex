@@ -43,3 +43,4 @@ describe('uniqueTeamNameValidator', () => {
     expect(result).toBeNull();
   });
 });
+

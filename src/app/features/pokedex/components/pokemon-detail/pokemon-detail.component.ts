@@ -318,3 +318,4 @@ export class PokemonDetailComponent {
     return hp + attack + defense + specialAttack + specialDefense + speed;
   });
 }
+
