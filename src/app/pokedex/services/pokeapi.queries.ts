@@ -41,3 +41,4 @@ export const GET_POKEMON_TYPES_QUERY = `
     }
   }
 `;
+

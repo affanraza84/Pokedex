@@ -24,3 +24,4 @@ export interface GraphQLRequestOptions {
   retries?: number;
   retryDelayMs?: number;
 }
+

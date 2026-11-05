@@ -54,3 +54,4 @@ describe('PokemonStore and Selectors', () => {
     expect(store.getSnapshot().selectedPokemonId).toBeNull();
   });
 });
+

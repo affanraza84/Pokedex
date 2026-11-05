@@ -24,3 +24,4 @@ export interface TeamInput {
   name: string;
   pokemons: TeamMember[];
 }
+

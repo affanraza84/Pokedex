@@ -14,3 +14,4 @@ export class LazyImageDirective implements OnInit {
     this.el.nativeElement.loading = 'lazy';
   }
 }
+

@@ -143,3 +143,4 @@ export class PokemonSelectors {
     shareReplay({ bufferSize: 1, refCount: true })
   );
 }
+

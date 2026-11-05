@@ -227,3 +227,4 @@ export class PokemonApiService {
     return { pokemons, totalCount };
   }
 }
+
