@@ -1,4 +1,4 @@
-import { Pokemon } from '../models/pokemon.model';
+import { Pokemon } from '../../pokedex/models/pokemon.model';
 
 /**
  * Curated authentic Generation 1 Pokémon dataset.

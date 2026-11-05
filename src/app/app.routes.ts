@@ -9,12 +9,12 @@ export const routes: Routes = [
   {
     path: 'pokedex',
     loadComponent: () =>
-      import('./features/pokedex/pokedex.component').then(m => m.PokedexComponent)
+      import('./pokedex/pokedex.component').then(m => m.PokedexComponent)
   },
   {
     path: 'teams',
     loadComponent: () =>
-      import('./features/team-builder/team-builder.component').then(m => m.TeamBuilderComponent)
+      import('./teams/teams.component').then(m => m.TeamsComponent)
   },
   {
     path: '**',
