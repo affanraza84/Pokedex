@@ -13,7 +13,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['grass', 'poison'],
     height: 7,
     weight: 69,
-    stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45, total: 318 }
+    stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45, total: 318 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 2,
@@ -23,7 +24,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['grass', 'poison'],
     height: 10,
     weight: 130,
-    stats: { hp: 60, attack: 62, defense: 63, specialAttack: 80, specialDefense: 80, speed: 60, total: 405 }
+    stats: { hp: 60, attack: 62, defense: 63, specialAttack: 80, specialDefense: 80, speed: 60, total: 405 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 3,
@@ -33,7 +35,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['grass', 'poison'],
     height: 20,
     weight: 1000,
-    stats: { hp: 80, attack: 82, defense: 83, specialAttack: 100, specialDefense: 100, speed: 80, total: 525 }
+    stats: { hp: 80, attack: 82, defense: 83, specialAttack: 100, specialDefense: 100, speed: 80, total: 525 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 4,
@@ -43,7 +46,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['fire'],
     height: 6,
     weight: 85,
-    stats: { hp: 39, attack: 52, defense: 43, specialAttack: 60, specialDefense: 50, speed: 65, total: 309 }
+    stats: { hp: 39, attack: 52, defense: 43, specialAttack: 60, specialDefense: 50, speed: 65, total: 309 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 5,
@@ -53,7 +57,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['fire'],
     height: 11,
     weight: 190,
-    stats: { hp: 58, attack: 64, defense: 58, specialAttack: 80, specialDefense: 65, speed: 80, total: 405 }
+    stats: { hp: 58, attack: 64, defense: 58, specialAttack: 80, specialDefense: 65, speed: 80, total: 405 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 6,
@@ -63,7 +68,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['fire', 'flying'],
     height: 17,
     weight: 905,
-    stats: { hp: 78, attack: 84, defense: 78, specialAttack: 109, specialDefense: 85, speed: 100, total: 534 }
+    stats: { hp: 78, attack: 84, defense: 78, specialAttack: 109, specialDefense: 85, speed: 100, total: 534 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 7,
@@ -73,7 +79,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['water'],
     height: 5,
     weight: 90,
-    stats: { hp: 44, attack: 48, defense: 65, specialAttack: 50, specialDefense: 64, speed: 43, total: 314 }
+    stats: { hp: 44, attack: 48, defense: 65, specialAttack: 50, specialDefense: 64, speed: 43, total: 314 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 8,
@@ -83,7 +90,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['water'],
     height: 10,
     weight: 225,
-    stats: { hp: 59, attack: 63, defense: 80, specialAttack: 65, specialDefense: 80, speed: 58, total: 405 }
+    stats: { hp: 59, attack: 63, defense: 80, specialAttack: 65, specialDefense: 80, speed: 58, total: 405 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 9,
@@ -93,7 +101,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['water'],
     height: 16,
     weight: 855,
-    stats: { hp: 79, attack: 83, defense: 100, specialAttack: 85, specialDefense: 105, speed: 78, total: 530 }
+    stats: { hp: 79, attack: 83, defense: 100, specialAttack: 85, specialDefense: 105, speed: 78, total: 530 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 10,
@@ -103,7 +112,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['bug'],
     height: 3,
     weight: 29,
-    stats: { hp: 45, attack: 30, defense: 35, specialAttack: 20, specialDefense: 20, speed: 45, total: 195 }
+    stats: { hp: 45, attack: 30, defense: 35, specialAttack: 20, specialDefense: 20, speed: 45, total: 195 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 12,
@@ -113,7 +123,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['bug', 'flying'],
     height: 11,
     weight: 320,
-    stats: { hp: 60, attack: 45, defense: 50, specialAttack: 90, specialDefense: 80, speed: 70, total: 395 }
+    stats: { hp: 60, attack: 45, defense: 50, specialAttack: 90, specialDefense: 80, speed: 70, total: 395 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 25,
@@ -123,7 +134,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['electric'],
     height: 4,
     weight: 60,
-    stats: { hp: 35, attack: 55, defense: 40, specialAttack: 50, specialDefense: 50, speed: 90, total: 320 }
+    stats: { hp: 35, attack: 55, defense: 40, specialAttack: 50, specialDefense: 50, speed: 90, total: 320 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 26,
@@ -133,7 +145,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['electric'],
     height: 8,
     weight: 300,
-    stats: { hp: 60, attack: 90, defense: 55, specialAttack: 90, specialDefense: 80, speed: 110, total: 485 }
+    stats: { hp: 60, attack: 90, defense: 55, specialAttack: 90, specialDefense: 80, speed: 110, total: 485 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 39,
@@ -143,7 +156,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['normal', 'fairy'],
     height: 5,
     weight: 55,
-    stats: { hp: 115, attack: 45, defense: 20, specialAttack: 45, specialDefense: 25, speed: 20, total: 270 }
+    stats: { hp: 115, attack: 45, defense: 20, specialAttack: 45, specialDefense: 25, speed: 20, total: 270 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 52,
@@ -153,7 +167,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['normal'],
     height: 4,
     weight: 42,
-    stats: { hp: 40, attack: 45, defense: 35, specialAttack: 40, specialDefense: 40, speed: 90, total: 290 }
+    stats: { hp: 40, attack: 45, defense: 35, specialAttack: 40, specialDefense: 40, speed: 90, total: 290 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 54,
@@ -163,7 +178,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['water'],
     height: 8,
     weight: 196,
-    stats: { hp: 50, attack: 52, defense: 48, specialAttack: 65, specialDefense: 50, speed: 55, total: 320 }
+    stats: { hp: 50, attack: 52, defense: 48, specialAttack: 65, specialDefense: 50, speed: 55, total: 320 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 65,
@@ -173,7 +189,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['psychic'],
     height: 15,
     weight: 480,
-    stats: { hp: 55, attack: 50, defense: 45, specialAttack: 135, specialDefense: 95, speed: 120, total: 500 }
+    stats: { hp: 55, attack: 50, defense: 45, specialAttack: 135, specialDefense: 95, speed: 120, total: 500 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 68,
@@ -183,7 +200,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['fighting'],
     height: 16,
     weight: 1300,
-    stats: { hp: 90, attack: 130, defense: 80, specialAttack: 65, specialDefense: 85, speed: 55, total: 505 }
+    stats: { hp: 90, attack: 130, defense: 80, specialAttack: 65, specialDefense: 85, speed: 55, total: 505 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 94,
@@ -193,7 +211,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['ghost', 'poison'],
     height: 15,
     weight: 405,
-    stats: { hp: 60, attack: 65, defense: 60, specialAttack: 130, specialDefense: 75, speed: 110, total: 500 }
+    stats: { hp: 60, attack: 65, defense: 60, specialAttack: 130, specialDefense: 75, speed: 110, total: 500 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 95,
@@ -203,7 +222,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['rock', 'ground'],
     height: 88,
     weight: 2100,
-    stats: { hp: 35, attack: 45, defense: 160, specialAttack: 30, specialDefense: 45, speed: 70, total: 385 }
+    stats: { hp: 35, attack: 45, defense: 160, specialAttack: 30, specialDefense: 45, speed: 70, total: 385 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 130,
@@ -213,7 +233,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['water', 'flying'],
     height: 65,
     weight: 2350,
-    stats: { hp: 95, attack: 125, defense: 79, specialAttack: 60, specialDefense: 100, speed: 81, total: 540 }
+    stats: { hp: 95, attack: 125, defense: 79, specialAttack: 60, specialDefense: 100, speed: 81, total: 540 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 131,
@@ -223,7 +244,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['water', 'ice'],
     height: 25,
     weight: 2200,
-    stats: { hp: 130, attack: 85, defense: 80, specialAttack: 85, specialDefense: 95, speed: 60, total: 535 }
+    stats: { hp: 130, attack: 85, defense: 80, specialAttack: 85, specialDefense: 95, speed: 60, total: 535 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 133,
@@ -233,7 +255,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['normal'],
     height: 3,
     weight: 65,
-    stats: { hp: 55, attack: 55, defense: 50, specialAttack: 45, specialDefense: 65, speed: 55, total: 325 }
+    stats: { hp: 55, attack: 55, defense: 50, specialAttack: 45, specialDefense: 65, speed: 55, total: 325 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 143,
@@ -243,7 +266,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['normal'],
     height: 21,
     weight: 4600,
-    stats: { hp: 160, attack: 110, defense: 65, specialAttack: 65, specialDefense: 110, speed: 30, total: 540 }
+    stats: { hp: 160, attack: 110, defense: 65, specialAttack: 65, specialDefense: 110, speed: 30, total: 540 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 144,
@@ -253,7 +277,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['ice', 'flying'],
     height: 17,
     weight: 554,
-    stats: { hp: 90, attack: 85, defense: 100, specialAttack: 95, specialDefense: 125, speed: 85, total: 580 }
+    stats: { hp: 90, attack: 85, defense: 100, specialAttack: 95, specialDefense: 125, speed: 85, total: 580 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 145,
@@ -263,7 +288,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['electric', 'flying'],
     height: 16,
     weight: 526,
-    stats: { hp: 90, attack: 90, defense: 85, specialAttack: 125, specialDefense: 90, speed: 100, total: 580 }
+    stats: { hp: 90, attack: 90, defense: 85, specialAttack: 125, specialDefense: 90, speed: 100, total: 580 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 146,
@@ -273,7 +299,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['fire', 'flying'],
     height: 20,
     weight: 600,
-    stats: { hp: 90, attack: 100, defense: 90, specialAttack: 125, specialDefense: 85, speed: 90, total: 580 }
+    stats: { hp: 90, attack: 100, defense: 90, specialAttack: 125, specialDefense: 85, speed: 90, total: 580 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 149,
@@ -283,7 +310,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['dragon', 'flying'],
     height: 22,
     weight: 2100,
-    stats: { hp: 91, attack: 134, defense: 95, specialAttack: 100, specialDefense: 100, speed: 80, total: 600 }
+    stats: { hp: 91, attack: 134, defense: 95, specialAttack: 100, specialDefense: 100, speed: 80, total: 600 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 150,
@@ -293,7 +321,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['psychic'],
     height: 20,
     weight: 1220,
-    stats: { hp: 106, attack: 110, defense: 90, specialAttack: 154, specialDefense: 90, speed: 130, total: 680 }
+    stats: { hp: 106, attack: 110, defense: 90, specialAttack: 154, specialDefense: 90, speed: 130, total: 680 },
+    abilities: [{ name: "standard", isHidden: false }]
   },
   {
     id: 151,
@@ -303,7 +332,8 @@ export const FALLBACK_POKEMONS: Pokemon[] = [
     types: ['psychic'],
     height: 4,
     weight: 40,
-    stats: { hp: 100, attack: 100, defense: 100, specialAttack: 100, specialDefense: 100, speed: 100, total: 600 }
+    stats: { hp: 100, attack: 100, defense: 100, specialAttack: 100, specialDefense: 100, speed: 100, total: 600 },
+    abilities: [{ name: "standard", isHidden: false }]
   }
 ];
 

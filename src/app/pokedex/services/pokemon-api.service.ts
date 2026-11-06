@@ -1,18 +1,33 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { GraphQLService } from '../../core/services/graphql.service';
-import { GET_POKEMON_LIST_QUERY, GET_POKEMON_TYPES_QUERY } from './pokeapi.queries';
-import { Pokemon, PokemonFilter, PokemonListResponse, PokemonStats } from '../models/pokemon.model';
-import { FALLBACK_POKEMONS, POKEMON_TYPES } from '../../core/data/pokemon-fallback.data';
+import {
+  GET_POKEMON_LIST_QUERY,
+  GET_POKEMON_BY_ID_QUERY,
+  GET_POKEMON_TYPES_QUERY
+} from './pokeapi.queries';
+import {
+  Pokemon,
+  PokemonAbility,
+  PokemonFilter,
+  PokemonListResponse,
+  PokemonStats
+} from '../models/pokemon.model';
 
 interface PokeApiStatNode {
   base_stat: number;
-  pokemon_v2_stat: { name: string };
+  pokemon_v2_stat: { id: number; name: string };
 }
 
 interface PokeApiTypeNode {
-  pokemon_v2_type: { name: string };
+  pokemon_v2_type: { id: number; name: string };
+}
+
+interface PokeApiAbilityNode {
+  is_hidden: boolean;
+  slot?: number;
+  pokemon_v2_ability: { id: number; name: string };
 }
 
 interface PokeApiPokemonNode {
@@ -23,6 +38,7 @@ interface PokeApiPokemonNode {
   pokemon_v2_pokemonsprites: Array<{ sprites: string | Record<string, unknown> }>;
   pokemon_v2_pokemontypes: PokeApiTypeNode[];
   pokemon_v2_pokemonstats: PokeApiStatNode[];
+  pokemon_v2_pokemonabilities: PokeApiAbilityNode[];
 }
 
 interface PokeApiListResponse {
@@ -34,30 +50,38 @@ interface PokeApiListResponse {
   };
 }
 
+interface PokeApiDetailResponse {
+  pokemon_v2_pokemon_by_pk: PokeApiPokemonNode | null;
+}
+
 /**
- * Service for querying Pokémon data from the PokéAPI GraphQL endpoint.
- * Features retry handling, response normalization, and an offline fallback.
+ * Dedicated service for public PokéAPI GraphQL operations.
+ * Endpoint: https://beta.pokeapi.co/graphql/v1beta
+ *
+ * Implements exponential backoff retries, response normalization,
+ * and passes typed errors to consumers without silently swallowing them.
  */
 @Injectable({
   providedIn: 'root'
 })
 export class PokemonApiService {
   private readonly graphqlService = inject(GraphQLService);
-  private readonly pokeApiEndpoint = 'https://beta.pokeapi.co/graphql/v1beta';
+  public readonly pokeApiEndpoint = 'https://beta.pokeapi.co/graphql/v1beta';
 
   /**
    * Fetches a paginated, filtered, and sorted list of Pokémon from PokéAPI GraphQL.
    *
-   * @param filter Filter, pagination, and sorting parameters.
+   * @param filter Pagination, search, type, and sort parameters.
    * @returns Observable emitting the normalized Pokémon list and total count.
+   * @throws GraphQLError | GraphQLNetworkError | GraphQLHttpError
    */
-  public getPokemons(filter: PokemonFilter): Observable<{ response: PokemonListResponse; fromFallback: boolean }> {
+  public getPokemons(filter: PokemonFilter): Observable<PokemonListResponse> {
     const limit = filter.pageSize;
     const offset = (filter.page - 1) * filter.pageSize;
 
     // Build GraphQL 'where' condition
     const whereConditions: Record<string, unknown> = {};
-    if (filter.search.trim()) {
+    if (filter.search && filter.search.trim()) {
       whereConditions['name'] = { _ilike: `%${filter.search.trim().toLowerCase()}%` };
     }
     if (filter.type) {
@@ -90,49 +114,64 @@ export class PokemonApiService {
         map(data => {
           const pokemons = data.pokemon_v2_pokemon.map(node => this.normalizePokemon(node));
           const totalCount = data.pokemon_v2_pokemon_aggregate?.aggregate?.count ?? pokemons.length;
-          return {
-            response: { pokemons, totalCount },
-            fromFallback: false
-          };
-        }),
-        catchError(error => {
-          console.warn(
-            '[PokemonApiService] PokéAPI GraphQL request failed or network blocked; activating fallback dataset:',
-            error.message
-          );
-          return of({
-            response: this.filterFallbackDataset(filter),
-            fromFallback: true
-          });
+          return { pokemons, totalCount };
         })
       );
   }
 
   /**
-   * Fetches all available Pokémon types.
+   * Retrieves single Pokémon details by its PokéAPI ID.
    *
-   * @returns Observable emitting the list of type names.
+   * @param id The Pokémon numeric ID.
+   * @returns Observable emitting the normalized Pokemon or throwing if not found.
+   */
+  public getPokemonById(id: number): Observable<Pokemon> {
+    return this.graphqlService
+      .execute<PokeApiDetailResponse>(
+        this.pokeApiEndpoint,
+        GET_POKEMON_BY_ID_QUERY,
+        { id },
+        { retries: 3, retryDelayMs: 1000 }
+      )
+      .pipe(
+        map(data => {
+          if (!data.pokemon_v2_pokemon_by_pk) {
+            throw new Error(`Pokémon with ID #${id} not found.`);
+          }
+          return this.normalizePokemon(data.pokemon_v2_pokemon_by_pk);
+        })
+      );
+  }
+
+  /**
+   * Fetches all official Pokémon types from PokéAPI GraphQL.
+   *
+   * @returns Observable of type name strings.
    */
   public getTypes(): Observable<string[]> {
     return this.graphqlService
-      .execute<{ pokemon_v2_type: Array<{ name: string }> }>(
+      .execute<{ pokemon_v2_type: Array<{ id: number; name: string }> }>(
         this.pokeApiEndpoint,
         GET_POKEMON_TYPES_QUERY,
         undefined,
         { retries: 2, retryDelayMs: 500 }
       )
       .pipe(
-        map(data => data.pokemon_v2_type.map(t => t.name).filter(t => t !== 'unknown' && t !== 'shadow')),
-        catchError(() => of(POKEMON_TYPES))
+        map(data =>
+          data.pokemon_v2_type
+            .map(t => t.name)
+            .filter(t => t !== 'unknown' && t !== 'shadow')
+        )
       );
   }
 
   /**
-   * Normalizes a raw GraphQL node into the application's Pokemon domain model.
+   * Normalizes a raw GraphQL node into the application's domain model.
    */
-  private normalizePokemon(node: PokeApiPokemonNode): Pokemon {
+  public normalizePokemon(node: PokeApiPokemonNode): Pokemon {
     const stats = this.extractStats(node.pokemon_v2_pokemonstats);
     const types = node.pokemon_v2_pokemontypes.map(t => t.pokemon_v2_type.name);
+    const abilities = this.extractAbilities(node.pokemon_v2_pokemonabilities);
 
     let spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${node.id}.png`;
     let artworkUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${node.id}.png`;
@@ -147,7 +186,7 @@ export class PokemonApiService {
         }
       }
     } catch {
-      // Defaults
+      // Keep robust defaults
     }
 
     return {
@@ -158,7 +197,8 @@ export class PokemonApiService {
       sprite: spriteUrl,
       artwork: artworkUrl,
       types,
-      stats
+      stats,
+      abilities
     };
   }
 
@@ -183,48 +223,14 @@ export class PokemonApiService {
   }
 
   /**
-   * Client-side filter, sort, and pagination of fallback data.
+   * Extracts abilities from the GraphQL abilities array.
    */
-  private filterFallbackDataset(filter: PokemonFilter): PokemonListResponse {
-    let result = [...FALLBACK_POKEMONS];
-
-    if (filter.search.trim()) {
-      const search = filter.search.trim().toLowerCase();
-      result = result.filter(p => p.name.toLowerCase().includes(search));
-    }
-
-    if (filter.type) {
-      const targetType = filter.type.toLowerCase();
-      result = result.filter(p => p.types.includes(targetType));
-    }
-
-    // Sort
-    const { sortField, sortOrder } = filter;
-    result.sort((a, b) => {
-      let valA: string | number;
-      let valB: string | number;
-
-      if (sortField === 'name') {
-        valA = a.name;
-        valB = b.name;
-      } else if (sortField === 'id') {
-        valA = a.id;
-        valB = b.id;
-      } else {
-        valA = a.stats[sortField] ?? 0;
-        valB = b.stats[sortField] ?? 0;
-      }
-
-      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    const totalCount = result.length;
-    const startIndex = (filter.page - 1) * filter.pageSize;
-    const pokemons = result.slice(startIndex, startIndex + filter.pageSize);
-
-    return { pokemons, totalCount };
+  private extractAbilities(abilityNodes: PokeApiAbilityNode[]): PokemonAbility[] {
+    if (!abilityNodes) return [];
+    return abilityNodes.map(node => ({
+      name: node.pokemon_v2_ability.name,
+      isHidden: node.is_hidden,
+      slot: node.slot
+    }));
   }
 }
-

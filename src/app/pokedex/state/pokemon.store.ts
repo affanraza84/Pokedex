@@ -7,8 +7,9 @@ import {
   tap,
   catchError
 } from 'rxjs/operators';
-import { Pokemon, PokemonFilter, SortField, SortOrder } from '../models/pokemon.model';
+import { Pokemon, PokemonFilter, PokemonListResponse, SortField, SortOrder } from '../models/pokemon.model';
 import { PokemonApiService } from '../services/pokemon-api.service';
+import { FALLBACK_POKEMONS } from '../../core/data/pokemon-fallback.data';
 
 export interface PokemonState {
   pokemons: Pokemon[];
@@ -209,23 +210,69 @@ export class PokemonStore {
       .pipe(
         tap(result => {
           this.updateState({
-            pokemons: result.response.pokemons,
-            totalCount: result.response.totalCount,
-            isFallback: result.fromFallback,
+            pokemons: result.pokemons,
+            totalCount: result.totalCount,
+            isFallback: false,
             loading: false,
             error: null
           });
         }),
         catchError(err => {
+          console.warn('[PokemonStore] PokéAPI request failed; using fallback dataset:', err);
+          const fallbackResult = this.filterFallbackDataset(filter);
           this.updateState({
+            pokemons: fallbackResult.pokemons,
+            totalCount: fallbackResult.totalCount,
+            isFallback: true,
             loading: false,
-            error: err instanceof Error ? err.message : 'Failed to load Pokémon data'
+            error: err instanceof Error ? err.message : 'PokéAPI request failed'
           });
           return of(null);
         }),
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe();
+  }
+
+  private filterFallbackDataset(filter: PokemonFilter): PokemonListResponse {
+    let result = [...FALLBACK_POKEMONS];
+
+    if (filter.search && filter.search.trim()) {
+      const search = filter.search.trim().toLowerCase();
+      result = result.filter(p => p.name.toLowerCase().includes(search));
+    }
+
+    if (filter.type) {
+      const targetType = filter.type.toLowerCase();
+      result = result.filter(p => p.types.includes(targetType));
+    }
+
+    const { sortField, sortOrder } = filter;
+    result.sort((a, b) => {
+      let valA: string | number;
+      let valB: string | number;
+
+      if (sortField === 'name') {
+        valA = a.name;
+        valB = b.name;
+      } else if (sortField === 'id') {
+        valA = a.id;
+        valB = b.id;
+      } else {
+        valA = a.stats[sortField] ?? 0;
+        valB = b.stats[sortField] ?? 0;
+      }
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    const totalCount = result.length;
+    const startIndex = (filter.page - 1) * filter.pageSize;
+    const pokemons = result.slice(startIndex, startIndex + filter.pageSize);
+
+    return { pokemons, totalCount };
   }
 }
 

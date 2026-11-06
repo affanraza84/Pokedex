@@ -1,61 +1,88 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { GraphQLService } from '../../core/services/graphql.service';
 import {
   GET_ALL_TEAMS_QUERY,
+  GET_TEAM_BY_ID_QUERY,
   CREATE_TEAM_MUTATION,
-  DELETE_TEAM_MUTATION
+  DELETE_TEAM_MUTATION,
+  GET_ALL_TRAINERS_QUERY,
+  CREATE_TRAINER_MUTATION
 } from './team.queries';
-import { Team, TeamInput, TeamMember } from '../models/team.model';
+import { Team, TeamInput, TeamMember, Trainer } from '../models/team.model';
+
+interface GraphQlTrainerNode {
+  id: string;
+  name: string;
+  Teams?: Array<{ id: string; name: string }>;
+}
 
 interface GraphQlTeamNode {
   id: string;
   name: string;
+  trainer_id?: string | null;
   pokemons: string;
+  Trainer?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 /**
- * Service for managing teams against the local json-graphql-server.
- * Local server target: http://localhost:4000/
+ * Dedicated service for local Teams & Trainers GraphQL server.
+ * Default Endpoint: http://localhost:4000/
+ *
+ * Implements schema-accurate queries and mutations discovered directly from db.js,
+ * properly maps and deserializes member JSON, and propagates typed errors.
  */
 @Injectable({
   providedIn: 'root'
 })
 export class TeamApiService {
   private readonly graphqlService = inject(GraphQLService);
-  private readonly localEndpoint = 'http://localhost:4000/';
-  private readonly storageKey = 'pokedex_local_teams_backup';
+  public readonly localEndpoint = 'http://localhost:4000/';
 
   /**
-   * Fetches all saved teams from the local GraphQL server.
+   * Fetches all saved teams with their assigned trainer and Pokémon members.
    *
+   * @param page Optional page index.
+   * @param perPage Optional count per page.
    * @returns Observable of Team array.
    */
-  public getTeams(): Observable<Team[]> {
+  public getTeams(page?: number, perPage?: number): Observable<Team[]> {
     return this.graphqlService
-      .execute<{ allTeams: GraphQlTeamNode[] }>(this.localEndpoint, GET_ALL_TEAMS_QUERY)
+      .execute<{ allTeams: GraphQlTeamNode[] }>(this.localEndpoint, GET_ALL_TEAMS_QUERY, {
+        page,
+        perPage
+      })
+      .pipe(map(data => data.allTeams.map(t => this.deserializeTeam(t))));
+  }
+
+  /**
+   * Retrieves a single team by its unique ID.
+   *
+   * @param id The ID of the team.
+   * @returns Observable of Team or throws if not found.
+   */
+  public getTeamById(id: string): Observable<Team> {
+    return this.graphqlService
+      .execute<{ Team: GraphQlTeamNode | null }>(this.localEndpoint, GET_TEAM_BY_ID_QUERY, { id })
       .pipe(
         map(data => {
-          const teams = data.allTeams.map(t => this.deserializeTeam(t));
-          this.backupTeams(teams);
-          return teams;
-        }),
-        catchError(error => {
-          console.warn(
-            '[TeamApiService] Local GraphQL server unreachable (http://localhost:4000/). Using local backup:',
-            error.message
-          );
-          return of(this.getStoredBackupTeams());
+          if (!data.Team) {
+            throw new Error(`Team with ID "${id}" was not found.`);
+          }
+          return this.deserializeTeam(data.Team);
         })
       );
   }
 
   /**
-   * Creates a new team on the local GraphQL server.
+   * Creates a new team in the local GraphQL database.
    *
-   * @param input Name and list of Pokémon members.
-   * @returns Observable emitting the newly created Team.
+   * @param input Team creation payload including name, members list, and optional trainer ID.
+   * @returns Observable emitting the confirmed Team record.
    */
   public createTeam(input: TeamInput): Observable<Team> {
     const pokemonsJson = JSON.stringify(input.pokemons);
@@ -63,24 +90,14 @@ export class TeamApiService {
     return this.graphqlService
       .execute<{ createTeam: GraphQlTeamNode }>(this.localEndpoint, CREATE_TEAM_MUTATION, {
         name: input.name,
-        pokemons: pokemonsJson
+        pokemons: pokemonsJson,
+        trainer_id: input.trainer_id || undefined
       })
-      .pipe(
-        map(data => {
-          const created = this.deserializeTeam(data.createTeam);
-          const current = this.getStoredBackupTeams();
-          this.backupTeams([created, ...current]);
-          return created;
-        }),
-        catchError(error => {
-          console.warn('[TeamApiService] Server creation failed:', error.message);
-          throw error;
-        })
-      );
+      .pipe(map(data => this.deserializeTeam(data.createTeam)));
   }
 
   /**
-   * Deletes a team by ID from the local GraphQL server.
+   * Deletes a team by ID from the local GraphQL database.
    *
    * @param id The ID of the team to delete.
    * @returns Observable emitting true when deletion is confirmed.
@@ -88,20 +105,50 @@ export class TeamApiService {
   public deleteTeam(id: string): Observable<boolean> {
     return this.graphqlService
       .execute<{ removeTeam: { id: string } }>(this.localEndpoint, DELETE_TEAM_MUTATION, { id })
+      .pipe(map(data => !!data.removeTeam?.id));
+  }
+
+  /**
+   * Fetches all registered trainers from the local GraphQL database.
+   *
+   * @returns Observable of Trainer array.
+   */
+  public getTrainers(): Observable<Trainer[]> {
+    return this.graphqlService
+      .execute<{ allTrainers: GraphQlTrainerNode[] }>(this.localEndpoint, GET_ALL_TRAINERS_QUERY)
       .pipe(
-        map(() => {
-          const current = this.getStoredBackupTeams().filter(t => t.id !== id);
-          this.backupTeams(current);
-          return true;
-        }),
-        catchError(error => {
-          console.warn('[TeamApiService] Server deletion failed:', error.message);
-          throw error;
-        })
+        map(data =>
+          data.allTrainers.map(t => ({
+            id: String(t.id),
+            name: t.name
+          }))
+        )
       );
   }
 
-  private deserializeTeam(node: GraphQlTeamNode): Team {
+  /**
+   * Creates a new Trainer in the local GraphQL database.
+   *
+   * @param name Trainer name.
+   * @returns Observable emitting the created Trainer.
+   */
+  public createTrainer(name: string): Observable<Trainer> {
+    return this.graphqlService
+      .execute<{ createTrainer: GraphQlTrainerNode }>(this.localEndpoint, CREATE_TRAINER_MUTATION, {
+        name
+      })
+      .pipe(
+        map(data => ({
+          id: String(data.createTrainer.id),
+          name: data.createTrainer.name
+        }))
+      );
+  }
+
+  /**
+   * Deserializes a raw GraphQL team record into the application's domain model.
+   */
+  public deserializeTeam(node: GraphQlTeamNode): Team {
     let pokemons: TeamMember[] = [];
     try {
       pokemons = typeof node.pokemons === 'string' ? JSON.parse(node.pokemons) : node.pokemons;
@@ -112,54 +159,14 @@ export class TeamApiService {
     return {
       id: String(node.id),
       name: node.name,
+      trainer_id: node.trainer_id ? String(node.trainer_id) : null,
+      trainer: node.Trainer
+        ? {
+            id: String(node.Trainer.id),
+            name: node.Trainer.name
+          }
+        : null,
       pokemons
     };
   }
-
-  private backupTeams(teams: Team[]): void {
-    try {
-      localStorage.setItem(this.storageKey, JSON.stringify(teams));
-    } catch {
-      // Ignore
-    }
-  }
-
-  private getStoredBackupTeams(): Team[] {
-    try {
-      const raw = localStorage.getItem(this.storageKey);
-      if (raw) return JSON.parse(raw);
-    } catch {
-      // Ignore
-    }
-    return [
-      {
-        id: '1',
-        name: 'Kanto Starters (Offline Backup)',
-        pokemons: [
-          {
-            id: 1,
-            name: 'bulbasaur',
-            sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png',
-            types: ['grass', 'poison'],
-            stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45, total: 318 }
-          },
-          {
-            id: 4,
-            name: 'charmander',
-            sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png',
-            types: ['fire'],
-            stats: { hp: 39, attack: 52, defense: 43, specialAttack: 60, specialDefense: 50, speed: 65, total: 309 }
-          },
-          {
-            id: 7,
-            name: 'squirtle',
-            sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png',
-            types: ['water'],
-            stats: { hp: 44, attack: 48, defense: 65, specialAttack: 50, specialDefense: 64, speed: 43, total: 314 }
-          }
-        ]
-      }
-    ];
-  }
 }
-

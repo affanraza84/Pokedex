@@ -20,6 +20,12 @@ export interface PokemonStats {
   total: number;
 }
 
+export interface PokemonAbility {
+  name: string;
+  isHidden: boolean;
+  slot?: number;
+}
+
 export interface Pokemon {
   id: number;
   name: string;
@@ -27,6 +33,7 @@ export interface Pokemon {
   artwork: string;
   types: string[];
   stats: PokemonStats;
+  abilities: PokemonAbility[];
   height?: number;
   weight?: number;
 }
@@ -54,4 +61,3 @@ export interface TypeDistributionItem {
   count: number;
   percentage: number;
 }
-
