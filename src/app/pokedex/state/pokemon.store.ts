@@ -1,18 +1,26 @@
 import { Injectable, inject, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { BehaviorSubject, Subject, of } from 'rxjs';
+import { BehaviorSubject, Subject, Observable, of } from 'rxjs';
 import {
   debounceTime,
   distinctUntilChanged,
+  switchMap,
   tap,
   catchError
 } from 'rxjs/operators';
-import { Pokemon, PokemonFilter, PokemonListResponse, SortField, SortOrder } from '../models/pokemon.model';
+import {
+  Pokemon,
+  PokemonFilter,
+  PokemonListResponse,
+  SortField,
+  SortOrder
+} from '../models/pokemon.model';
 import { PokemonApiService } from '../services/pokemon-api.service';
 import { FALLBACK_POKEMONS } from '../../core/data/pokemon-fallback.data';
 
 export interface PokemonState {
   pokemons: Pokemon[];
+  allLoadedPokemons: Pokemon[];
   totalCount: number;
   loading: boolean;
   error: string | null;
@@ -29,6 +37,7 @@ export interface PokemonState {
 
 const INITIAL_STATE: PokemonState = {
   pokemons: [],
+  allLoadedPokemons: [],
   totalCount: 0,
   loading: false,
   error: null,
@@ -45,7 +54,7 @@ const INITIAL_STATE: PokemonState = {
 
 /**
  * Custom RxJS-based reactive store for Pokédex data.
- * Manages Pokémon list state, filters, sorting, and pagination via BehaviorSubject.
+ * Manages Pokémon state, caching, search debouncing, and pagination via BehaviorSubject.
  */
 @Injectable({
   providedIn: 'root'
@@ -55,52 +64,57 @@ export class PokemonStore {
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly state$ = new BehaviorSubject<PokemonState>(INITIAL_STATE);
-  private readonly searchTrigger$ = new Subject<string>();
+
+  // Search input stream for debounced pipeline
+  private readonly searchInput$ = new Subject<string>();
+
+  // In-memory query response cache to avoid duplicate API calls
+  private readonly queryCache = new Map<string, PokemonListResponse>();
 
   constructor() {
     this.initSearchPipeline();
-    this.loadTypes();
-    this.fetchPokemons();
+    this.loadAvailableTypes();
+    this.fetchCurrentPage();
   }
 
   /**
-   * Returns an observable of the full state.
+   * Returns an Observable of the full Pokémon state.
    */
-  public getState$() {
+  public getState$(): Observable<PokemonState> {
     return this.state$.asObservable();
   }
 
   /**
-   * Returns current snapshot of the state.
+   * Returns a snapshot of the current state.
    */
   public getSnapshot(): PokemonState {
     return this.state$.getValue();
   }
 
   /**
-   * Updates the search term using debounced pipeline.
+   * Updates the search term using a debounced, cancellable RxJS pipeline.
    *
-   * @param term The query string entered by user.
+   * @param term The user search query string.
    */
   public setSearchTerm(term: string): void {
     this.updateState({ searchTerm: term, page: 1 });
-    this.searchTrigger$.next(term);
+    this.searchInput$.next(term);
   }
 
   /**
    * Filters Pokémon by type.
    *
-   * @param type Pokémon type (e.g., 'fire', 'water') or empty string for all.
+   * @param type The Pokémon type string, or empty string for all types.
    */
   public setSelectedType(type: string): void {
     this.updateState({ selectedType: type, page: 1 });
-    this.fetchPokemons();
+    this.fetchCurrentPage();
   }
 
   /**
-   * Sorts Pokémon by a stat or identifier.
+   * Sorts the list by a given Pokémon attribute. Toggles ASC/DESC if field matches current sort.
    *
-   * @param field The property to sort by (e.g., 'hp', 'attack', 'name').
+   * @param field The field to sort by.
    */
   public setSort(field: SortField): void {
     const current = this.getSnapshot();
@@ -111,32 +125,32 @@ export class PokemonStore {
     }
 
     this.updateState({ sortField: field, sortOrder: order, page: 1 });
-    this.fetchPokemons();
+    this.fetchCurrentPage();
   }
 
   /**
-   * Sets current page index.
+   * Navigates to a specific page number.
    *
    * @param page Target page number (1-indexed).
    */
   public setPage(page: number): void {
     if (page < 1) return;
     this.updateState({ page });
-    this.fetchPokemons();
+    this.fetchCurrentPage();
   }
 
   /**
-   * Sets the number of items per page.
+   * Sets the page size (e.g., 10, 25, 50).
    *
-   * @param pageSize Page size (10, 25, or 50).
+   * @param pageSize Number of items per page.
    */
   public setPageSize(pageSize: number): void {
     this.updateState({ pageSize, page: 1 });
-    this.fetchPokemons();
+    this.fetchCurrentPage();
   }
 
   /**
-   * Selects a Pokémon to view in the slide-in detail panel.
+   * Selects a Pokémon by ID for display in the detail panel.
    *
    * @param pokemonId ID of the selected Pokémon, or null to close panel.
    */
@@ -145,14 +159,15 @@ export class PokemonStore {
   }
 
   /**
-   * Triggers a manual reload of the Pokémon list.
+   * Clears the query cache and triggers a fresh network reload.
    */
   public reload(): void {
-    this.fetchPokemons();
+    this.queryCache.clear();
+    this.fetchCurrentPage();
   }
 
   /**
-   * Internal helper to update state immutably.
+   * Updates individual properties of the state immutably.
    */
   private updateState(partial: Partial<PokemonState>): void {
     this.state$.next({
@@ -162,38 +177,51 @@ export class PokemonStore {
   }
 
   /**
-   * Initializes the debounced search stream pipeline.
-   * Uses debounceTime(300), distinctUntilChanged(), and switchMap().
+   * Initializes the search pipeline with the exact sequence:
+   * debounceTime(300) -> distinctUntilChanged() -> switchMap()
+   * Cancels in-flight requests when a newer search arrives.
    */
   private initSearchPipeline(): void {
-    this.searchTrigger$
+    this.searchInput$
       .pipe(
         debounceTime(300),
         distinctUntilChanged(),
-        tap(() => this.fetchPokemons()),
+        switchMap(() => this.executeFetch()),
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe();
   }
 
   /**
-   * Loads the list of available Pokémon types.
+   * Triggers an immediate fetch for non-search actions (pagination, sort, type filter).
    */
-  private loadTypes(): void {
-    this.apiService
-      .getTypes()
-      .pipe(
-        tap(types => this.updateState({ availableTypes: types })),
-        takeUntilDestroyed(this.destroyRef)
-      )
+  private fetchCurrentPage(): void {
+    this.executeFetch()
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe();
   }
 
   /**
-   * Fetches Pokémon based on current state parameters.
+   * Executes the fetch operation with caching to avoid duplicate requests.
    */
-  private fetchPokemons(): void {
+  private executeFetch(): Observable<PokemonListResponse> {
     const s = this.getSnapshot();
+    const cacheKey = `${s.searchTerm}:${s.selectedType}:${s.sortField}:${s.sortOrder}:${s.page}:${s.pageSize}`;
+
+    // Return cached result immediately if available
+    if (this.queryCache.has(cacheKey)) {
+      const cached = this.queryCache.get(cacheKey)!;
+      this.updateState({
+        pokemons: cached.pokemons,
+        totalCount: cached.totalCount,
+        loading: false,
+        error: null
+      });
+      return of(cached);
+    }
+
+    this.updateState({ loading: true, error: null });
+
     const filter: PokemonFilter = {
       search: s.searchTerm,
       type: s.selectedType,
@@ -203,37 +231,70 @@ export class PokemonStore {
       sortOrder: s.sortOrder
     };
 
-    this.updateState({ loading: true, error: null });
+    return this.apiService.getPokemons(filter).pipe(
+      tap(result => {
+        // Cache this query response
+        this.queryCache.set(cacheKey, result);
+        this.cacheLoadedPokemons(result.pokemons);
 
+        this.updateState({
+          pokemons: result.pokemons,
+          totalCount: result.totalCount,
+          loading: false,
+          error: null,
+          isFallback: false
+        });
+      }),
+      catchError(err => {
+        console.warn('[PokemonStore] PokéAPI query failed, falling back to local dataset:', err);
+        const fallbackResult = this.filterFallbackDataset(filter);
+        this.cacheLoadedPokemons(fallbackResult.pokemons);
+
+        this.updateState({
+          pokemons: fallbackResult.pokemons,
+          totalCount: fallbackResult.totalCount,
+          loading: false,
+          error: err instanceof Error ? err.message : 'PokéAPI request failed',
+          isFallback: true
+        });
+
+        return of(fallbackResult);
+      })
+    );
+  }
+
+  /**
+   * Accumulates distinct Pokémon in memory across pages for instant autocomplete lookup.
+   */
+  private cacheLoadedPokemons(newPokemons: Pokemon[]): void {
+    const current = this.getSnapshot().allLoadedPokemons;
+    const existingIds = new Set(current.map(p => p.id));
+    const toAdd = newPokemons.filter(p => !existingIds.has(p.id));
+
+    if (toAdd.length > 0) {
+      this.updateState({
+        allLoadedPokemons: [...current, ...toAdd]
+      });
+    }
+  }
+
+  /**
+   * Loads the list of available Pokémon types.
+   */
+  private loadAvailableTypes(): void {
     this.apiService
-      .getPokemons(filter)
+      .getTypes()
       .pipe(
-        tap(result => {
-          this.updateState({
-            pokemons: result.pokemons,
-            totalCount: result.totalCount,
-            isFallback: false,
-            loading: false,
-            error: null
-          });
-        }),
-        catchError(err => {
-          console.warn('[PokemonStore] PokéAPI request failed; using fallback dataset:', err);
-          const fallbackResult = this.filterFallbackDataset(filter);
-          this.updateState({
-            pokemons: fallbackResult.pokemons,
-            totalCount: fallbackResult.totalCount,
-            isFallback: true,
-            loading: false,
-            error: err instanceof Error ? err.message : 'PokéAPI request failed'
-          });
-          return of(null);
-        }),
+        tap(types => this.updateState({ availableTypes: types })),
+        catchError(() => of([])),
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe();
   }
 
+  /**
+   * In-memory client-side filter and sorting for fallback data.
+   */
   private filterFallbackDataset(filter: PokemonFilter): PokemonListResponse {
     let result = [...FALLBACK_POKEMONS];
 
@@ -275,4 +336,3 @@ export class PokemonStore {
     return { pokemons, totalCount };
   }
 }
-

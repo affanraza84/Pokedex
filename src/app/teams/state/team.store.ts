@@ -5,12 +5,17 @@ import { map, shareReplay, distinctUntilChanged, tap, catchError } from 'rxjs/op
 import { Team, TeamInput } from '../models/team.model';
 import { TeamApiService } from '../services/team-api.service';
 
+export interface TeamNotification {
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
 export interface TeamState {
   teams: Team[];
   loading: boolean;
   saving: boolean;
   error: string | null;
-  notification: { message: string; type: 'success' | 'error' | 'info' } | null;
+  notification: TeamNotification | null;
 }
 
 const INITIAL_STATE: TeamState = {
@@ -23,7 +28,7 @@ const INITIAL_STATE: TeamState = {
 
 /**
  * Custom RxJS-based reactive store for managing Teams.
- * Features optimistic team creation with automatic rollback on network/server failure.
+ * Features optimistic team creation and deletion with automatic rollback on server error.
  */
 @Injectable({
   providedIn: 'root'
@@ -73,19 +78,18 @@ export class TeamStore {
   /**
    * Observable stream of transient notifications.
    */
-  public readonly notification$: Observable<{ message: string; type: 'success' | 'error' | 'info' } | null> =
-    this.state$.pipe(
-      map(s => s.notification),
-      distinctUntilChanged(),
-      shareReplay({ bufferSize: 1, refCount: true })
-    );
+  public readonly notification$: Observable<TeamNotification | null> = this.state$.pipe(
+    map(s => s.notification),
+    distinctUntilChanged(),
+    shareReplay({ bufferSize: 1, refCount: true })
+  );
 
   constructor() {
     this.loadTeams();
   }
 
   /**
-   * Fetches all teams from the GraphQL server.
+   * Fetches all existing teams from the GraphQL server.
    */
   public loadTeams(): void {
     this.updateState({ loading: true, error: null });
@@ -97,9 +101,11 @@ export class TeamStore {
           this.updateState({ teams, loading: false, error: null });
         }),
         catchError(err => {
+          const message = err instanceof Error ? err.message : 'Failed to fetch teams from server';
           this.updateState({
             loading: false,
-            error: err instanceof Error ? err.message : 'Failed to fetch teams'
+            error: message,
+            notification: { message, type: 'error' }
           });
           return of([]);
         }),
@@ -109,25 +115,27 @@ export class TeamStore {
   }
 
   /**
-   * Creates a team optimistically.
-   * Immediately updates UI state; if the server fails, rolls back to previous state.
+   * Optimistically creates a team.
+   * Immediately updates the UI with an optimistic candidate before the server responds.
+   * If the server mutation fails, rolls back the update and exposes the error to the UI.
    *
-   * @param input Name and list of Pokémon members.
+   * @param input Name, members list, and optional trainer ID.
    */
   public createTeam(input: TeamInput): void {
     const previousTeams = [...this.state$.getValue().teams];
     const tempId = `optimistic-${Date.now()}`;
 
-    // 1. Optimistic candidate
+    // 1. Construct optimistic team candidate
     const optimisticTeam: Team = {
       id: tempId,
       name: input.name,
+      trainer_id: input.trainer_id ?? null,
       pokemons: [...input.pokemons],
       createdAt: new Date().toISOString(),
       isOptimistic: true
     };
 
-    // 2. Optimistic UI update
+    // 2. Immediately update the UI before the server responds
     this.updateState({
       teams: [optimisticTeam, ...previousTeams],
       saving: true,
@@ -135,33 +143,38 @@ export class TeamStore {
       notification: { message: `Adding team "${input.name}"...`, type: 'info' }
     });
 
-    // 3. Dispatch GraphQL mutation
+    // 3. Dispatch server mutation
     this.apiService
       .createTeam(input)
       .pipe(
         tap(serverConfirmedTeam => {
           const currentTeams = this.state$.getValue().teams;
+          // Replace optimistic placeholder with server-confirmed team
           const updatedTeams = currentTeams.map(t =>
             t.id === tempId ? { ...serverConfirmedTeam, isOptimistic: false } : t
           );
+
           this.updateState({
             teams: updatedTeams,
             saving: false,
+            error: null,
             notification: {
-              message: `Team "${serverConfirmedTeam.name}" created successfully!`,
+              message: `Team "${serverConfirmedTeam.name}" saved successfully!`,
               type: 'success'
             }
           });
         }),
         catchError(err => {
           console.error('[TeamStore] Server mutation failed. Performing optimistic rollback!', err);
-          // 4. ROLLBACK to previous state
+          const errorMessage = err instanceof Error ? err.message : 'Server error creating team';
+
+          // 4. Rollback the optimistic update to previous state
           this.updateState({
             teams: previousTeams,
             saving: false,
-            error: 'Failed to save team to server. Optimistic change rolled back.',
+            error: `Failed to create team on server. Optimistic change rolled back: ${errorMessage}`,
             notification: {
-              message: `Could not save team "${input.name}". Rolled back.`,
+              message: `Could not save team "${input.name}". Changes rolled back.`,
               type: 'error'
             }
           });
@@ -173,7 +186,7 @@ export class TeamStore {
   }
 
   /**
-   * Deletes a team by ID optimistically with rollback on failure.
+   * Optimistically deletes a team by ID with automatic rollback on error.
    *
    * @param id The ID of the team to delete.
    */
@@ -182,9 +195,11 @@ export class TeamStore {
     const targetTeam = previousTeams.find(t => t.id === id);
     if (!targetTeam) return;
 
+    // Immediately remove from UI
     this.updateState({
       teams: previousTeams.filter(t => t.id !== id),
-      notification: { message: `Removing team "${targetTeam.name}"...`, type: 'info' }
+      error: null,
+      notification: { message: `Deleting team "${targetTeam.name}"...`, type: 'info' }
     });
 
     this.apiService
@@ -196,12 +211,15 @@ export class TeamStore {
           });
         }),
         catchError(err => {
-          console.error('[TeamStore] Deletion failed. Rolling back!', err);
+          console.error('[TeamStore] Server deletion failed. Performing rollback!', err);
+          const errorMessage = err instanceof Error ? err.message : 'Server error deleting team';
+
+          // Rollback to previous state
           this.updateState({
             teams: previousTeams,
-            error: 'Failed to delete team on server. Restored team.',
+            error: `Failed to delete team on server. Restored team: ${errorMessage}`,
             notification: {
-              message: `Failed to delete team "${targetTeam.name}". Rolled back.`,
+              message: `Failed to delete team "${targetTeam.name}". Restored.`,
               type: 'error'
             }
           });
@@ -213,7 +231,14 @@ export class TeamStore {
   }
 
   /**
-   * Clears active transient notification.
+   * Clears the active error message.
+   */
+  public clearError(): void {
+    this.updateState({ error: null });
+  }
+
+  /**
+   * Clears the active transient notification.
    */
   public clearNotification(): void {
     this.updateState({ notification: null });
@@ -237,4 +262,3 @@ export class TeamStore {
     });
   }
 }
-

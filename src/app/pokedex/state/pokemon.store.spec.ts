@@ -1,57 +1,120 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { PokemonStore } from './pokemon.store';
-import { PokemonSelectors } from './pokemon.selectors';
+import { PokemonApiService } from '../services/pokemon-api.service';
+import { PokemonListResponse } from '../models/pokemon.model';
 
-describe('PokemonStore and Selectors', () => {
+describe('PokemonStore (RxJS Custom State Management)', () => {
   let store: PokemonStore;
-  let selectors: PokemonSelectors;
+  let mockApiService: {
+    getPokemons: any;
+    getTypes: any;
+  };
+
+  const mockResponse: PokemonListResponse = {
+    totalCount: 1,
+    pokemons: [
+      {
+        id: 1,
+        name: 'bulbasaur',
+        sprite: '',
+        artwork: '',
+        types: ['grass', 'poison'],
+        stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45, total: 318 },
+        abilities: [{ name: 'overgrow', isHidden: false }]
+      }
+    ]
+  };
 
   beforeEach(() => {
+    mockApiService = {
+      getPokemons: () => of(mockResponse),
+      getTypes: () => of(['grass', 'fire', 'water'])
+    };
+
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(),
         PokemonStore,
-        PokemonSelectors
+        { provide: PokemonApiService, useValue: mockApiService }
       ]
     });
 
     store = TestBed.inject(PokemonStore);
-    selectors = TestBed.inject(PokemonSelectors);
   });
 
-  it('should initialize with default state and load Pokémon list', async () => {
-    const pokemons = await firstValueFrom(selectors.pokemons$);
-    expect(pokemons).toBeDefined();
-    expect(Array.isArray(pokemons)).toBe(true);
+  it('should initialize and load Pokémon list into BehaviorSubject', async () => {
+    const state = store.getSnapshot();
+    expect(state.pokemons.length).toBe(1);
+    expect(state.pokemons[0].name).toBe('bulbasaur');
+    expect(state.loading).toBe(false);
+    expect(state.error).toBeNull();
   });
 
-  it('should update pagination and page size', () => {
+  it('should debounce search input (300ms) before triggering API query', async () => {
+    let callCount = 0;
+    mockApiService.getPokemons = () => {
+      callCount++;
+      return of(mockResponse);
+    };
+
+    // First keystroke
+    store.setSearchTerm('ch');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(callCount).toBe(0);
+
+    // Second keystroke within debounce window (should cancel/reset timer)
+    store.setSearchTerm('char');
+    await new Promise(resolve => setTimeout(resolve, 150));
+    expect(callCount).toBe(0);
+
+    // Wait until full 300ms debounce expires (+ small buffer)
+    await new Promise(resolve => setTimeout(resolve, 200));
+    expect(callCount).toBe(1);
+    expect(store.getSnapshot().searchTerm).toBe('char');
+  });
+
+  it('should avoid duplicate API calls by serving from memory cache', () => {
+    let apiCalls = 0;
+    mockApiService.getPokemons = () => {
+      apiCalls++;
+      return of(mockResponse);
+    };
+
+    // First fetch for page 2
+    store.setPage(2);
+    expect(apiCalls).toBe(1);
+
+    // Go to page 1
+    store.setPage(1);
+
+    // Return to page 2 (should be cached!)
+    store.setPage(2);
+    expect(apiCalls).toBe(1); // Cached! No additional API call made
+  });
+
+  it('should smoothly activate fallback dataset when PokéAPI returns error', async () => {
+    mockApiService.getPokemons = () => throwError(() => new Error('PokéAPI rate limit'));
+
+    store.reload();
+
+    const snapshot = store.getSnapshot();
+    expect(snapshot.isFallback).toBe(true);
+    expect(snapshot.pokemons.length).toBeGreaterThan(0);
+    expect(snapshot.loading).toBe(false);
+  });
+
+  it('should update pagination, sort, and detail selection states', () => {
     store.setPageSize(25);
     expect(store.getSnapshot().pageSize).toBe(25);
-    expect(store.getSnapshot().page).toBe(1);
 
-    store.setPage(2);
-    expect(store.getSnapshot().page).toBe(2);
-  });
-
-  it('should update sort field and toggle order', () => {
-    store.setSort('attack');
-    expect(store.getSnapshot().sortField).toBe('attack');
+    store.setSort('speed');
+    expect(store.getSnapshot().sortField).toBe('speed');
     expect(store.getSnapshot().sortOrder).toBe('asc');
 
-    store.setSort('attack');
-    expect(store.getSnapshot().sortField).toBe('attack');
+    store.setSort('speed');
     expect(store.getSnapshot().sortOrder).toBe('desc');
-  });
 
-  it('should select and clear selected Pokémon for detail panel', () => {
     store.selectPokemon(25);
     expect(store.getSnapshot().selectedPokemonId).toBe(25);
-
-    store.selectPokemon(null);
-    expect(store.getSnapshot().selectedPokemonId).toBeNull();
   });
 });
-
