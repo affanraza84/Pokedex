@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Pokemon } from '../../models/pokemon.model';
 import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
@@ -21,7 +21,7 @@ import { StatRadarChartComponent } from '../stat-radar-chart/stat-radar-chart.co
           
           <header class="drawer-header">
             <div class="title-group">
-              <span class="pokedex-id">#{{ p.id.toString().padStart(3, '0') }}</span>
+              <span class="pokedex-id">{{ formattedPokedexId() }}</span>
               <h2 class="pokemon-name">{{ p.name | titlecase }}</h2>
             </div>
             <button
@@ -39,6 +39,7 @@ import { StatRadarChartComponent } from '../stat-radar-chart/stat-radar-chart.co
                 [src]="p.artwork || p.sprite"
                 [alt]="p.name"
                 class="pokemon-art"
+                (load)="onImageLoaded()"
                 loading="lazy" />
               <div class="types-row">
                 @for (type of p.types; track type) {
@@ -64,58 +65,23 @@ import { StatRadarChartComponent } from '../stat-radar-chart/stat-radar-chart.co
               <div class="stat-header-row">
                 <h3 class="section-title">Stat Breakdown</h3>
                 <span class="total-stat-pill">
-                  Total: <strong>{{ calculatedTotal() }}</strong>
+                  Total Base Stats: <strong>{{ calculatedTotal() }}</strong>
                 </span>
               </div>
 
               <div class="stat-bars">
-                <div class="stat-bar-row">
-                  <span class="stat-label">HP</span>
-                  <span class="stat-val">{{ p.stats.hp }}</span>
-                  <div class="progress-track">
-                    <div class="progress-fill hp" [style.width.%]="(p.stats.hp / 255) * 100"></div>
+                @for (stat of statBreakdown(); track stat.key) {
+                  <div class="stat-bar-row">
+                    <span class="stat-label">{{ stat.label }}</span>
+                    <span class="stat-val">{{ stat.val }}</span>
+                    <div class="progress-track">
+                      <div
+                        class="progress-fill"
+                        [class]="stat.key"
+                        [style.width.%]="stat.percent"></div>
+                    </div>
                   </div>
-                </div>
-
-                <div class="stat-bar-row">
-                  <span class="stat-label">Attack</span>
-                  <span class="stat-val">{{ p.stats.attack }}</span>
-                  <div class="progress-track">
-                    <div class="progress-fill attack" [style.width.%]="(p.stats.attack / 255) * 100"></div>
-                  </div>
-                </div>
-
-                <div class="stat-bar-row">
-                  <span class="stat-label">Defense</span>
-                  <span class="stat-val">{{ p.stats.defense }}</span>
-                  <div class="progress-track">
-                    <div class="progress-fill defense" [style.width.%]="(p.stats.defense / 255) * 100"></div>
-                  </div>
-                </div>
-
-                <div class="stat-bar-row">
-                  <span class="stat-label">Sp. Atk</span>
-                  <span class="stat-val">{{ p.stats.specialAttack }}</span>
-                  <div class="progress-track">
-                    <div class="progress-fill sp-atk" [style.width.%]="(p.stats.specialAttack / 255) * 100"></div>
-                  </div>
-                </div>
-
-                <div class="stat-bar-row">
-                  <span class="stat-label">Sp. Def</span>
-                  <span class="stat-val">{{ p.stats.specialDefense }}</span>
-                  <div class="progress-track">
-                    <div class="progress-fill sp-def" [style.width.%]="(p.stats.specialDefense / 255) * 100"></div>
-                  </div>
-                </div>
-
-                <div class="stat-bar-row">
-                  <span class="stat-label">Speed</span>
-                  <span class="stat-val">{{ p.stats.speed }}</span>
-                  <div class="progress-track">
-                    <div class="progress-fill speed" [style.width.%]="(p.stats.speed / 255) * 100"></div>
-                  </div>
-                </div>
+                }
               </div>
             </section>
           </div>
@@ -288,8 +254,8 @@ import { StatRadarChartComponent } from '../stat-radar-chart/stat-radar-chart.co
     .progress-fill.hp { background: #ff5959; }
     .progress-fill.attack { background: #f5ac78; }
     .progress-fill.defense { background: #fae078; }
-    .progress-fill.sp-atk { background: #9db7f5; }
-    .progress-fill.sp-def { background: #a7db8d; }
+    .progress-fill.specialAttack { background: #9db7f5; }
+    .progress-fill.specialDefense { background: #a7db8d; }
     .progress-fill.speed { background: #fa92b2; }
 
     @keyframes slideInRight {
@@ -303,19 +269,52 @@ import { StatRadarChartComponent } from '../stat-radar-chart/stat-radar-chart.co
   `]
 })
 export class PokemonDetailComponent {
+  // Angular Signal Inputs
   public readonly isOpen = input<boolean>(false);
   public readonly pokemon = input<Pokemon | null>(null);
 
+  // Angular Signal Output
   public readonly closed = output<void>();
 
+  // Local UI signal for image loading state
+  public readonly isImageLoaded = signal<boolean>(false);
+
   /**
-   * Derived total base stats using Angular Signals computed().
+   * Requirement 2: Derived total base stats using Angular Signals computed().
    */
-  public readonly calculatedTotal = computed(() => {
+  public readonly calculatedTotal = computed<number>(() => {
     const p = this.pokemon();
     if (!p) return 0;
     const { hp, attack, defense, specialAttack, specialDefense, speed } = p.stats;
     return hp + attack + defense + specialAttack + specialDefense + speed;
   });
+
+  /**
+   * Derived formatted national Dex ID (e.g. #001).
+   */
+  public readonly formattedPokedexId = computed<string>(() => {
+    const p = this.pokemon();
+    return p ? `#${p.id.toString().padStart(3, '0')}` : '#000';
+  });
+
+  /**
+   * Derived 6-stat breakdown with normalized percentages for progress bars using computed().
+   */
+  public readonly statBreakdown = computed(() => {
+    const p = this.pokemon();
+    if (!p) return [];
+    return [
+      { key: 'hp', label: 'HP', val: p.stats.hp, percent: Math.min(100, Math.round((p.stats.hp / 255) * 100)) },
+      { key: 'attack', label: 'Attack', val: p.stats.attack, percent: Math.min(100, Math.round((p.stats.attack / 255) * 100)) },
+      { key: 'defense', label: 'Defense', val: p.stats.defense, percent: Math.min(100, Math.round((p.stats.defense / 255) * 100)) },
+      { key: 'specialAttack', label: 'Sp. Atk', val: p.stats.specialAttack, percent: Math.min(100, Math.round((p.stats.specialAttack / 255) * 100)) },
+      { key: 'specialDefense', label: 'Sp. Def', val: p.stats.specialDefense, percent: Math.min(100, Math.round((p.stats.specialDefense / 255) * 100)) },
+      { key: 'speed', label: 'Speed', val: p.stats.speed, percent: Math.min(100, Math.round((p.stats.speed / 255) * 100)) }
+    ];
+  });
+
+  onImageLoaded(): void {
+    this.isImageLoaded.set(true);
+  }
 }
 

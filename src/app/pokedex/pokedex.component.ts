@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   inject,
   signal,
+  computed,
   effect
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -51,7 +52,7 @@ import { Pokemon, SortField } from './models/pokemon.model';
 
       <app-pokemon-table
         [pokemons]="pokemons()"
-        [loading]="loading()"
+        [loading]="loading() || isDetailLoading()"
         [selectedId]="selectedPokemon()?.id ?? null"
         [sortField]="sortInfo().field"
         [sortOrder]="sortInfo().order"
@@ -121,6 +122,7 @@ export class PokedexComponent {
   private readonly store = inject(PokemonStore);
   private readonly selectors = inject(PokemonSelectors);
 
+  // Requirement 4: toSignal() bridges RxJS store selectors into Angular Signals
   public readonly pokemons = toSignal(this.selectors.pokemons$, { initialValue: [] });
   public readonly loading = toSignal(this.selectors.loading$, { initialValue: false });
   public readonly error = toSignal(this.selectors.error$, { initialValue: null });
@@ -141,8 +143,19 @@ export class PokedexComponent {
     }
   });
 
+  // Requirement 1: signal() for Selected Pokémon
   public readonly selectedPokemon = signal<Pokemon | null>(null);
+
+  // Requirement 1: signal() for Detail Panel Visibility
   public readonly isDetailOpen = signal<boolean>(false);
+
+  // Requirement 1: signal() for UI Loading Flag
+  public readonly isDetailLoading = signal<boolean>(false);
+
+  // Requirement 2: computed() for derived UI filter status
+  public readonly hasActiveFilters = computed<boolean>(() => {
+    return this.searchTerm().trim().length > 0 || this.selectedType().length > 0;
+  });
 
   constructor() {
     const storeSelected = toSignal(this.selectors.selectedPokemon$, { initialValue: null });
@@ -173,10 +186,12 @@ export class PokedexComponent {
   }
 
   onSelectPokemon(id: number): void {
+    this.isDetailLoading.set(true);
     const found = this.pokemons().find(p => p.id === id) ?? null;
     this.selectedPokemon.set(found);
     this.isDetailOpen.set(true);
     this.store.selectPokemon(id);
+    this.isDetailLoading.set(false);
   }
 
   onCloseDetail(): void {

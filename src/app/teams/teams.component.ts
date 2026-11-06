@@ -4,7 +4,8 @@ import {
   inject,
   signal,
   computed,
-  effect
+  effect,
+  untracked
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -17,6 +18,32 @@ import { Team, TeamInput, TeamMember } from './models/team.model';
 import { TypeDistributionItem } from '../pokedex/models/pokemon.model';
 import { TypeColorPipe } from '../shared/pipes/type-color.pipe';
 import { FALLBACK_POKEMONS } from '../core/data/pokemon-fallback.data';
+
+const SELECTED_TEAM_STORAGE_KEY = 'pokedex_selected_team_id';
+
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
+    } catch {
+      // Ignore
+    }
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
+    } catch {
+      // Ignore
+    }
+  }
+};
 
 @Component({
   selector: 'app-teams',
@@ -38,20 +65,33 @@ import { FALLBACK_POKEMONS } from '../core/data/pokemon-fallback.data';
         </p>
       </section>
 
-      <!-- Type Distribution Widget (computed() signal) -->
+      <!-- Type Distribution & Base Stats Synergy Widget (computed() signals) -->
       @if (activeTeamMembers().length > 0) {
         <aside class="synergy-card">
           <div class="synergy-header">
             <div class="synergy-title-group">
               <span class="synergy-icon">⚡</span>
-              <h3 class="synergy-title">
-                Team Type Distribution & Synergy
-                @if (selectedTeam(); as st) {
-                  <span>(Viewing: {{ st.name }})</span>
-                } @else {
-                  <span>(Current Draft)</span>
-                }
-              </h3>
+              <div>
+                <h3 class="synergy-title">
+                  Team Synergy & Stat Analysis
+                  @if (selectedTeam(); as st) {
+                    <span>(Viewing: {{ st.name }})</span>
+                  } @else {
+                    <span>(Current Draft)</span>
+                  }
+                </h3>
+                <div class="stats-summary-row">
+                  <span class="summary-pill">
+                    Total Base Stats: <strong>{{ teamTotalBaseStats() }}</strong>
+                  </span>
+                  <span class="summary-pill">
+                    Avg / Pokémon: <strong>{{ teamAverageBaseStats() }}</strong>
+                  </span>
+                  <span class="summary-pill" [class.complete]="isTeamComplete()">
+                    Squad: <strong>{{ activeTeamMembers().length }} / 6</strong>
+                  </span>
+                </div>
+              </div>
             </div>
             @if (selectedTeam()) {
               <button
@@ -169,6 +209,29 @@ import { FALLBACK_POKEMONS } from '../core/data/pokemon-fallback.data';
       font-size: 0.95rem;
       margin-left: 6px;
     }
+    .stats-summary-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .summary-pill {
+      font-size: 0.78rem;
+      background: #f1f5f9;
+      color: #475569;
+      padding: 3px 10px;
+      border-radius: 9999px;
+    }
+    .summary-pill strong {
+      color: #0f172a;
+    }
+    .summary-pill.complete {
+      background: #dcfce7;
+      color: #15803d;
+    }
+    .summary-pill.complete strong {
+      color: #15803d;
+    }
     .view-draft-btn {
       padding: 6px 14px;
       background: #f1f5f9;
@@ -264,6 +327,37 @@ export class TeamsComponent {
     return this.draftMembers();
   });
 
+  /**
+   * Requirement 2: Derived team total base stats across all members using computed().
+   */
+  public readonly teamTotalBaseStats = computed<number>(() => {
+    const members = this.activeTeamMembers();
+    return members.reduce((sum, member) => {
+      if (!member.stats) return sum;
+      const { hp, attack, defense, specialAttack, specialDefense, speed } = member.stats;
+      return sum + (hp + attack + defense + specialAttack + specialDefense + speed);
+    }, 0);
+  });
+
+  /**
+   * Derived average base stats per team member using computed().
+   */
+  public readonly teamAverageBaseStats = computed<number>(() => {
+    const members = this.activeTeamMembers();
+    if (members.length === 0) return 0;
+    return Math.round(this.teamTotalBaseStats() / members.length);
+  });
+
+  /**
+   * Derived team completeness flag using computed().
+   */
+  public readonly isTeamComplete = computed<boolean>(() => {
+    return this.activeTeamMembers().length === 6;
+  });
+
+  /**
+   * Requirement 2: Derived team type distribution and percentages using computed().
+   */
   public readonly teamTypeDistribution = computed<TypeDistributionItem[]>(() => {
     const members = this.activeTeamMembers();
     if (members.length === 0) return [];
@@ -295,20 +389,26 @@ export class TeamsComponent {
   });
 
   constructor() {
-    const savedTeamId = localStorage.getItem('pokedex_selected_team_id');
-    if (savedTeamId) {
-      const timer = setTimeout(() => {
-        const found = this.teams().find(t => t.id === savedTeamId);
-        if (found) this.selectedTeam.set(found);
-      }, 500);
-    }
+    const savedTeamId = safeLocalStorage.getItem(SELECTED_TEAM_STORAGE_KEY);
 
+    // Restore selected team when teams list loads from store
+    effect(() => {
+      const availableTeams = this.teams();
+      if (savedTeamId && !untracked(this.selectedTeam) && availableTeams.length > 0) {
+        const found = availableTeams.find(t => t.id === savedTeamId);
+        if (found) {
+          this.selectedTeam.set(found);
+        }
+      }
+    });
+
+    // Requirement 3: Use effect() to persist the selected team in localStorage
     effect(() => {
       const current = this.selectedTeam();
       if (current) {
-        localStorage.setItem('pokedex_selected_team_id', current.id);
+        safeLocalStorage.setItem(SELECTED_TEAM_STORAGE_KEY, current.id);
       } else {
-        localStorage.removeItem('pokedex_selected_team_id');
+        safeLocalStorage.removeItem(SELECTED_TEAM_STORAGE_KEY);
       }
     });
   }
