@@ -88,5 +88,19 @@ describe('PokemonDetailComponent (Signals & Computed)', () => {
 
     expect(closedEmitted).toBe(true);
   });
+
+  it('should render abilities list with hidden ability indicator', () => {
+    fixture.componentRef.setInput('isOpen', true);
+    fixture.componentRef.setInput('pokemon', samplePokemon);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const abilityPills = compiled.querySelectorAll('.ability-pill');
+    expect(abilityPills.length).toBe(2);
+
+    expect(abilityPills[0].textContent).toContain('Blaze');
+    expect(abilityPills[1].textContent).toContain('Solar Power');
+    expect(abilityPills[1].querySelector('.hidden-label')?.textContent).toBe('Hidden');
+  });
 });
 

@@ -16,57 +16,51 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
           <thead>
             <tr>
               <th class="th-sprite">Sprite</th>
-              <th class="th-id sortable" (click)="sort.emit('id')">
-                #
-                @if (sortField() === 'id') {
-                  <span class="sort-icon">{{ sortOrder() === 'asc' ? '▲' : '▼' }}</span>
-                }
-              </th>
-              <th class="th-name sortable" (click)="sort.emit('name')">
+              <th class="th-name sortable" (click)="sort.emit('name')" title="Sort by Name">
                 Name
                 @if (sortField() === 'name') {
                   <span class="sort-icon">{{ sortOrder() === 'asc' ? '▲' : '▼' }}</span>
                 }
               </th>
               <th class="th-types">Types</th>
-              <th class="th-stat sortable" (click)="sort.emit('hp')">
+              <th class="th-stat sortable" (click)="sort.emit('hp')" title="Sort by HP">
                 HP
                 @if (sortField() === 'hp') {
                   <span class="sort-icon">{{ sortOrder() === 'asc' ? '▲' : '▼' }}</span>
                 }
               </th>
-              <th class="th-stat sortable" (click)="sort.emit('attack')">
-                Atk
+              <th class="th-stat sortable" (click)="sort.emit('attack')" title="Sort by Attack">
+                Attack
                 @if (sortField() === 'attack') {
                   <span class="sort-icon">{{ sortOrder() === 'asc' ? '▲' : '▼' }}</span>
                 }
               </th>
-              <th class="th-stat sortable" (click)="sort.emit('defense')">
-                Def
+              <th class="th-stat sortable" (click)="sort.emit('defense')" title="Sort by Defense">
+                Defense
                 @if (sortField() === 'defense') {
                   <span class="sort-icon">{{ sortOrder() === 'asc' ? '▲' : '▼' }}</span>
                 }
               </th>
-              <th class="th-stat sortable" (click)="sort.emit('specialAttack')">
-                Sp.Atk
+              <th class="th-stat sortable" (click)="sort.emit('specialAttack')" title="Sort by Special Attack">
+                Special Attack
                 @if (sortField() === 'specialAttack') {
                   <span class="sort-icon">{{ sortOrder() === 'asc' ? '▲' : '▼' }}</span>
                 }
               </th>
-              <th class="th-stat sortable" (click)="sort.emit('specialDefense')">
-                Sp.Def
+              <th class="th-stat sortable" (click)="sort.emit('specialDefense')" title="Sort by Special Defense">
+                Special Defense
                 @if (sortField() === 'specialDefense') {
                   <span class="sort-icon">{{ sortOrder() === 'asc' ? '▲' : '▼' }}</span>
                 }
               </th>
-              <th class="th-stat sortable" (click)="sort.emit('speed')">
-                Spd
+              <th class="th-stat sortable" (click)="sort.emit('speed')" title="Sort by Speed">
+                Speed
                 @if (sortField() === 'speed') {
                   <span class="sort-icon">{{ sortOrder() === 'asc' ? '▲' : '▼' }}</span>
                 }
               </th>
-              <th class="th-stat th-total sortable" (click)="sort.emit('total')">
-                Total
+              <th class="th-stat th-total sortable" (click)="sort.emit('total')" title="Sort by Total Base Stats">
+                Total Base Stats
                 @if (sortField() === 'total') {
                   <span class="sort-icon">{{ sortOrder() === 'asc' ? '▲' : '▼' }}</span>
                 }
@@ -75,10 +69,9 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
           </thead>
           <tbody>
             @if (loading()) {
-              @for (row of [1, 2, 3, 4, 5, 6, 7, 8]; track row) {
+              @for (row of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; track row) {
                 <tr class="skeleton-row">
                   <td><div class="skeleton-cell circle"></div></td>
-                  <td><div class="skeleton-cell w-30"></div></td>
                   <td><div class="skeleton-cell w-80"></div></td>
                   <td><div class="skeleton-cell w-60"></div></td>
                   <td><div class="skeleton-cell w-30"></div></td>
@@ -92,10 +85,11 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
               }
             } @else if (pokemons().length === 0) {
               <tr>
-                <td colspan="11" class="no-data-cell">
+                <td colspan="10" class="no-data-cell">
                   <div class="no-data-state">
                     <span class="no-data-icon">🔍</span>
-                    <p>No Pokémon found matching your criteria.</p>
+                    <p class="no-data-title">No Pokémon found</p>
+                    <p class="no-data-desc">Try adjusting your name search or elemental type filter.</p>
                   </div>
                 </td>
               </tr>
@@ -112,9 +106,11 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
                       class="sprite-img"
                       loading="lazy" />
                   </td>
-                  <td class="td-id">#{{ p.id.toString().padStart(3, '0') }}</td>
                   <td class="td-name">
-                    <span class="name-text">{{ p.name | titlecase }}</span>
+                    <div class="name-container">
+                      <span class="name-text">{{ p.name | titlecase }}</span>
+                      <span class="dex-num">#{{ p.id.toString().padStart(3, '0') }}</span>
+                    </div>
                   </td>
                   <td class="td-types">
                     <div class="type-badges-wrapper">
@@ -253,14 +249,19 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
       object-fit: contain;
       image-rendering: pixelated;
     }
-    .td-id {
-      color: #94a3b8;
-      font-weight: 600;
-      font-size: 0.85rem;
+    .name-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
     }
     .name-text {
       font-weight: 600;
       color: #0f172a;
+    }
+    .dex-num {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-weight: 600;
     }
     .type-badges-wrapper {
       display: flex;

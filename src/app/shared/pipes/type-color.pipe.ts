@@ -16,6 +16,7 @@ const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   rock: { bg: '#B8A038', text: '#FFFFFF' },
   ghost: { bg: '#705898', text: '#FFFFFF' },
   dragon: { bg: '#7038F8', text: '#FFFFFF' },
+  dark: { bg: '#705848', text: '#FFFFFF' },
   steel: { bg: '#B8B8D0', text: '#222222' },
   fairy: { bg: '#EE99AC', text: '#222222' }
 };

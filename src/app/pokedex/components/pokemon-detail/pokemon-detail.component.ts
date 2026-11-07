@@ -54,6 +54,23 @@ import { StatRadarChartComponent } from '../stat-radar-chart/stat-radar-chart.co
               </div>
             </div>
 
+            <!-- Abilities Section -->
+            <section class="abilities-section">
+              <h3 class="section-title">Abilities</h3>
+              <div class="abilities-list">
+                @for (ability of p.abilities; track ability.name) {
+                  <div class="ability-pill" [class.hidden-ability]="ability.isHidden">
+                    <span class="ability-name">{{ ability.name.replace('-', ' ') | titlecase }}</span>
+                    @if (ability.isHidden) {
+                      <span class="hidden-label">Hidden</span>
+                    }
+                  </div>
+                } @empty {
+                  <span class="empty-ability-text">None documented</span>
+                }
+              </div>
+            </section>
+
             <section class="chart-section">
               <h3 class="section-title">Base Stat Radar</h3>
               <app-stat-radar-chart
@@ -218,6 +235,48 @@ import { StatRadarChartComponent } from '../stat-radar-chart/stat-radar-chart.co
     }
     .total-stat-pill strong {
       color: #ef4444;
+    }
+    .abilities-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .abilities-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .ability-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    .ability-pill.hidden-ability {
+      background: #fdf4ff;
+      border-color: #f0abfc;
+      color: #86198f;
+    }
+    .hidden-label {
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 9999px;
+      background: #fae8ff;
+      color: #a21caf;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .empty-ability-text {
+      color: #94a3b8;
+      font-size: 0.85rem;
+      font-style: italic;
     }
     .stat-bars {
       display: flex;

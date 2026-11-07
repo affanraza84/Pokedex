@@ -76,6 +76,7 @@ export class StatRadarChartComponent implements OnDestroy {
     if (this.chartInstance) {
       this.chartInstance.data.datasets[0].data = dataValues;
       this.chartInstance.data.datasets[0].label = name;
+      this.chartInstance.reset();
       this.chartInstance.update();
       return;
     }

@@ -233,12 +233,18 @@ export class PokemonStore {
 
     return this.apiService.getPokemons(filter).pipe(
       tap(result => {
+        const sortedPokemons = this.sortPokemons(result.pokemons, filter.sortField, filter.sortOrder);
+        const processedResult: PokemonListResponse = {
+          pokemons: sortedPokemons,
+          totalCount: result.totalCount
+        };
+
         // Cache this query response
-        this.queryCache.set(cacheKey, result);
-        this.cacheLoadedPokemons(result.pokemons);
+        this.queryCache.set(cacheKey, processedResult);
+        this.cacheLoadedPokemons(sortedPokemons);
 
         this.updateState({
-          pokemons: result.pokemons,
+          pokemons: sortedPokemons,
           totalCount: result.totalCount,
           loading: false,
           error: null,
@@ -290,6 +296,31 @@ export class PokemonStore {
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe();
+  }
+
+  /**
+   * Sorts a Pokémon array by the given stat, name, or id attribute.
+   */
+  private sortPokemons(list: Pokemon[], field: SortField, order: SortOrder): Pokemon[] {
+    return [...list].sort((a, b) => {
+      let valA: string | number;
+      let valB: string | number;
+
+      if (field === 'name') {
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+      } else if (field === 'id') {
+        valA = a.id;
+        valB = b.id;
+      } else {
+        valA = a.stats?.[field] ?? 0;
+        valB = b.stats?.[field] ?? 0;
+      }
+
+      if (valA < valB) return order === 'asc' ? -1 : 1;
+      if (valA > valB) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
   }
 
   /**
