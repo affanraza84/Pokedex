@@ -5,8 +5,7 @@ import {
   input,
   output,
   signal,
-  computed,
-  effect
+  computed
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';

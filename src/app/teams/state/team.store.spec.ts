@@ -25,7 +25,7 @@ describe('TeamStore (Optimistic Creation & Rollback)', () => {
       getTeams: () => of([...initialTeams]),
       createTeam: (input: TeamInput) =>
         of({ id: 'server-999', name: input.name, pokemons: input.pokemons }),
-      deleteTeam: (id: string) => of(true)
+      deleteTeam: (_id: string) => of(true)
     };
 
     TestBed.configureTestingModule({
@@ -148,5 +148,24 @@ describe('TeamStore (Optimistic Creation & Rollback)', () => {
 
     expect(successCalled).toBe(false);
     expect(errorCalled).toBe(true);
+  });
+
+  it('should clear error and notification using store methods', async () => {
+    mockApiService.deleteTeam = () => throwError(() => new Error('Delete Error'));
+    store.deleteTeam('1');
+
+    let err = await firstValueFrom(store.error$);
+    expect(err).toBeTruthy();
+
+    store.clearError();
+    err = await firstValueFrom(store.error$);
+    expect(err).toBeNull();
+
+    let notif = await firstValueFrom(store.notification$);
+    expect(notif).toBeTruthy();
+
+    store.clearNotification();
+    notif = await firstValueFrom(store.notification$);
+    expect(notif).toBeNull();
   });
 });

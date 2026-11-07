@@ -55,7 +55,7 @@ describe('TeamApiService (Local GraphQL Operations)', () => {
   });
 
   it('should execute createTeam mutation with schema-matching variables', async () => {
-    mockGraphQLService.execute = (endpoint: string, query: string, variables: any) => {
+    mockGraphQLService.execute = (_endpoint: string, _query: string, variables: any) => {
       expect(variables.name).toBe('Aqua Squad');
       expect(variables.trainer_id).toBe('2');
       expect(typeof variables.pokemons).toBe('string');

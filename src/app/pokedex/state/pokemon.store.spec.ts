@@ -117,4 +117,28 @@ describe('PokemonStore (RxJS Custom State Management)', () => {
     store.selectPokemon(25);
     expect(store.getSnapshot().selectedPokemonId).toBe(25);
   });
+
+  it('should filter and sort Pokémon accurately in fallback offline mode', () => {
+    // Trigger fallback mode
+    mockApiService.getPokemons = () => throwError(() => new Error('Offline'));
+    store.reload();
+    expect(store.getSnapshot().isFallback).toBe(true);
+
+    // Filter by type 'fire'
+    store.setSelectedType('fire');
+    const firePokemons = store.getSnapshot().pokemons;
+    expect(firePokemons.length).toBeGreaterThan(0);
+    expect(firePokemons.every(p => p.types.includes('fire'))).toBe(true);
+
+    // Sort by attack descending
+    store.setSort('attack');
+    // First setSort sets asc
+    store.setSort('attack');
+    // Second setSort toggles to desc
+    expect(store.getSnapshot().sortOrder).toBe('desc');
+    const sorted = store.getSnapshot().pokemons;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      expect(sorted[i].stats.attack).toBeGreaterThanOrEqual(sorted[i + 1].stats.attack);
+    }
+  });
 });
