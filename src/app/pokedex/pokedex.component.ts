@@ -37,8 +37,39 @@ import { Pokemon, SortField } from './models/pokemon.model';
       @if (error(); as err) {
         <div class="error-banner" role="alert">
           <span class="error-icon">⚠️</span>
-          <span>{{ err }}</span>
-          <button type="button" class="retry-btn" (click)="onRetry()">Retry</button>
+          <div class="error-text">
+            <strong>PokéAPI Query Error:</strong>
+            <span>{{ err }}</span>
+          </div>
+          <button
+            type="button"
+            class="retry-btn"
+            [disabled]="loading()"
+            (click)="onRetry()">
+            @if (loading()) {
+              <span>Retrying...</span>
+            } @else {
+              <span>Retry Request</span>
+            }
+          </button>
+        </div>
+      }
+
+      @if (isFallback()) {
+        <div class="fallback-banner" role="status">
+          <span class="fallback-icon">🛡️</span>
+          <span>Offline Resilience Mode: Currently serving verified local Pokémon dataset.</span>
+          <button
+            type="button"
+            class="reconnect-btn"
+            [disabled]="loading()"
+            (click)="onRetry()">
+            @if (loading()) {
+              <span>Reconnecting...</span>
+            } @else {
+              <span>Reconnect PokéAPI</span>
+            }
+          </button>
         </div>
       }
 
@@ -53,6 +84,7 @@ import { Pokemon, SortField } from './models/pokemon.model';
       <app-pokemon-table
         [pokemons]="pokemons()"
         [loading]="loading() || isDetailLoading()"
+        [hasActiveFilters]="hasActiveFilters()"
         [selectedId]="selectedPokemon()?.id ?? null"
         [sortField]="sortInfo().field"
         [sortOrder]="sortInfo().order"
@@ -60,7 +92,8 @@ import { Pokemon, SortField } from './models/pokemon.model';
         (sort)="onSort($event)"
         (selectPokemon)="onSelectPokemon($event)"
         (pageChange)="onPageChange($event)"
-        (pageSizeChange)="onPageSizeChange($event)" />
+        (pageSizeChange)="onPageSizeChange($event)"
+        (clearFilters)="onResetFilters()" />
 
       <app-pokemon-detail
         [isOpen]="isDetailOpen()"
@@ -101,6 +134,11 @@ import { Pokemon, SortField } from './models/pokemon.model';
       font-size: 0.95rem;
       margin-bottom: 24px;
     }
+    .error-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
     .retry-btn {
       margin-left: auto;
       padding: 6px 14px;
@@ -113,8 +151,43 @@ import { Pokemon, SortField } from './models/pokemon.model';
       cursor: pointer;
       transition: background 0.15s;
     }
-    .retry-btn:hover {
+    .retry-btn:hover:not(:disabled) {
       background: #dc2626;
+    }
+    .retry-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .fallback-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 18px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      color: #1e40af;
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+    .reconnect-btn {
+      margin-left: auto;
+      padding: 6px 12px;
+      background: #3b82f6;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .reconnect-btn:hover:not(:disabled) {
+      background: #2563eb;
+    }
+    .reconnect-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
   `]
 })
@@ -126,6 +199,7 @@ export class PokedexComponent {
   public readonly pokemons = toSignal(this.selectors.pokemons$, { initialValue: [] });
   public readonly loading = toSignal(this.selectors.loading$, { initialValue: false });
   public readonly error = toSignal(this.selectors.error$, { initialValue: null });
+  public readonly isFallback = toSignal(this.selectors.isFallback$, { initialValue: false });
   public readonly searchTerm = toSignal(this.selectors.searchTerm$, { initialValue: '' });
   public readonly selectedType = toSignal(this.selectors.selectedType$, { initialValue: '' });
   public readonly availableTypes = toSignal(this.selectors.availableTypes$, { initialValue: [] });

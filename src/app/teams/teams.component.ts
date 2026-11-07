@@ -143,9 +143,11 @@ const safeLocalStorage = {
           <app-team-list
             [teams]="teams()"
             [loading]="loading()"
+            [error]="storeError()"
             [selectedTeamId]="selectedTeam()?.id ?? null"
             (deleteTeam)="onDeleteTeam($event)"
-            (selectTeam)="onSelectTeam($event)" />
+            (selectTeam)="onSelectTeam($event)"
+            (retryLoad)="onRetryTeams()" />
         </div>
       </div>
 
@@ -306,6 +308,7 @@ export class TeamsComponent {
   public readonly teams = toSignal(this.teamStore.teams$, { initialValue: [] });
   public readonly loading = toSignal(this.teamStore.loading$, { initialValue: false });
   public readonly saving = toSignal(this.teamStore.saving$, { initialValue: false });
+  public readonly storeError = toSignal(this.teamStore.error$, { initialValue: null });
   public readonly storeNotification = toSignal(this.teamStore.notification$, { initialValue: null });
   private readonly loadedPokemons = toSignal(this.pokemonSelectors.pokemons$, { initialValue: [] });
 
@@ -447,6 +450,10 @@ export class TeamsComponent {
 
   onCloseToast(): void {
     this.teamStore.clearNotification();
+  }
+
+  onRetryTeams(): void {
+    this.teamStore.loadTeams();
   }
 }
 

@@ -36,6 +36,7 @@ describe('PokedexComponent (Dashboard View Integration)', () => {
       pokemons$: of([mockPokemon]),
       loading$: of(false),
       error$: of(null),
+      isFallback$: of(false),
       searchTerm$: of(''),
       selectedType$: of(''),
       availableTypes$: of(['grass', 'poison', 'fire']),

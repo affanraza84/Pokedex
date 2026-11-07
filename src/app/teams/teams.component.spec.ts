@@ -55,7 +55,9 @@ describe('TeamsComponent (Angular Signals & Computed & Effects)', () => {
       teams$: of([mockTeam]),
       loading$: of(false),
       saving$: of(false),
+      error$: of(null),
       notification$: of(null),
+      loadTeams: () => {},
       createTeam: () => {},
       deleteTeam: () => {},
       clearNotification: () => {}

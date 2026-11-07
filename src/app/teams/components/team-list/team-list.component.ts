@@ -15,6 +15,24 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
         <span class="teams-count">{{ teams().length }} Teams</span>
       </div>
 
+      @if (error(); as err) {
+        <div class="team-error-banner" role="alert">
+          <span class="error-icon">⚠️</span>
+          <span class="error-text">{{ err }}</span>
+          <button
+            type="button"
+            class="retry-load-btn"
+            [disabled]="loading()"
+            (click)="retryLoad.emit()">
+            @if (loading()) {
+              <span>Retrying...</span>
+            } @else {
+              <span>Retry</span>
+            }
+          </button>
+        </div>
+      }
+
       @if (loading() && teams().length === 0) {
         <div class="loading-state">
           <span class="loading-spinner">⏳</span>
@@ -47,7 +65,9 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
                 <button
                   type="button"
                   class="delete-btn"
-                  aria-label="Delete team"
+                  [disabled]="team.isOptimistic"
+                  [attr.aria-label]="'Delete ' + team.name"
+                  [title]="team.isOptimistic ? 'Syncing with server...' : 'Delete team'"
                   (click)="$event.stopPropagation(); deleteTeam.emit(team.id)">
                   🗑️
                 </button>
@@ -240,13 +260,46 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
       color: #ef4444;
       font-weight: 500;
     }
+    .team-error-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 12px;
+      color: #b91c1c;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+    .retry-load-btn {
+      margin-left: auto;
+      padding: 6px 14px;
+      background: #ef4444;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .retry-load-btn:hover:not(:disabled) {
+      background: #dc2626;
+    }
+    .retry-load-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
   `]
 })
 export class TeamListComponent {
   public readonly teams = input<Team[]>([]);
   public readonly loading = input<boolean>(false);
+  public readonly error = input<string | null>(null);
   public readonly selectedTeamId = input<string | null>(null);
 
   public readonly deleteTeam = output<string>();
   public readonly selectTeam = output<Team>();
+  public readonly retryLoad = output<void>();
 }

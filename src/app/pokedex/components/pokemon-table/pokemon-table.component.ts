@@ -89,7 +89,21 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
                   <div class="no-data-state">
                     <span class="no-data-icon">🔍</span>
                     <p class="no-data-title">No Pokémon found</p>
-                    <p class="no-data-desc">Try adjusting your name search or elemental type filter.</p>
+                    <p class="no-data-desc">
+                      @if (hasActiveFilters()) {
+                        No Pokémon match your search or filter criteria.
+                      } @else {
+                        No Pokémon data available right now.
+                      }
+                    </p>
+                    @if (hasActiveFilters()) {
+                      <button
+                        type="button"
+                        class="clear-filters-btn"
+                        (click)="clearFilters.emit()">
+                        Clear Active Filters
+                      </button>
+                    }
                   </div>
                 </td>
               </tr>
@@ -296,6 +310,21 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
     .no-data-icon {
       font-size: 2rem;
     }
+    .clear-filters-btn {
+      margin-top: 8px;
+      padding: 8px 16px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      color: #0f172a;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .clear-filters-btn:hover {
+      background: #e2e8f0;
+    }
     .skeleton-cell {
       height: 18px;
       background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
@@ -375,6 +404,7 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
 export class PokemonTableComponent {
   public readonly pokemons = input<Pokemon[]>([]);
   public readonly loading = input<boolean>(false);
+  public readonly hasActiveFilters = input<boolean>(false);
   public readonly selectedId = input<number | null>(null);
   public readonly sortField = input<SortField>('id');
   public readonly sortOrder = input<SortOrder>('asc');
@@ -391,6 +421,7 @@ export class PokemonTableComponent {
   public readonly sort = output<SortField>();
   public readonly pageChange = output<number>();
   public readonly pageSizeChange = output<number>();
+  public readonly clearFilters = output<void>();
 
   onPageSizeChange(event: Event): void {
     const val = Number((event.target as HTMLSelectElement).value);
