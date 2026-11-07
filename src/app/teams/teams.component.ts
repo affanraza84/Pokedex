@@ -5,7 +5,8 @@ import {
   signal,
   computed,
   effect,
-  untracked
+  untracked,
+  viewChild
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -413,6 +414,8 @@ export class TeamsComponent {
     });
   }
 
+  private readonly teamFormRef = viewChild(TeamFormComponent);
+
   onDraftMembersChanged(members: TeamMember[]): void {
     this.draftMembers.set(members);
     if (this.selectedTeam()) {
@@ -421,7 +424,10 @@ export class TeamsComponent {
   }
 
   onTeamSubmitted(input: TeamInput): void {
-    this.teamStore.createTeam(input);
+    // Optimistic creation with rollback on failure; reset form ONLY on success
+    this.teamStore.createTeam(input, () => {
+      this.teamFormRef()?.resetForm();
+    });
   }
 
   onDeleteTeam(id: string): void {

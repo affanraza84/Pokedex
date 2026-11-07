@@ -1,6 +1,18 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, computed } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  output,
+  signal,
+  computed,
+  inject,
+  DestroyRef
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Pokemon } from '../../../pokedex/models/pokemon.model';
 import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
 
@@ -17,15 +29,16 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
           type="text"
           class="autocomplete-input"
           [disabled]="disabled()"
-          [placeholder]="disabled() ? 'Team is full (max 6 Pokémon)' : 'Search Pokémon to add to team...'"
-          [ngModel]="query()"
-          (ngModelChange)="onQueryChange($event)"
-          (focus)="isOpen.set(true)"
+          [placeholder]="disabled() ? 'Team is full (max 6 Pokémon)' : 'Search Pokémon to add to team (debounced 300ms)...'"
+          [ngModel]="inputVal()"
+          (ngModelChange)="onQueryInput($event)"
+          (focus)="onInputFocus()"
           aria-label="Search Pokémon to add to team" />
-        @if (query()) {
+        @if (inputVal()) {
           <button
             type="button"
             class="clear-btn"
+            aria-label="Clear autocomplete input"
             (click)="clearQuery()">
             ✕
           </button>
@@ -35,26 +48,33 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
       @if (isOpen() && filteredPokemons().length > 0 && !disabled()) {
         <div class="dropdown-menu" role="listbox">
           @for (p of filteredPokemons(); track p.id) {
+            @let inTeam = isAlreadyInTeam(p.id);
             <div
               class="dropdown-item"
               role="option"
-              [attr.aria-selected]="false"
-              (click)="onSelect(p)">
+              [class.item-disabled]="inTeam"
+              [attr.aria-selected]="inTeam"
+              (click)="!inTeam && onSelect(p)">
               <img [src]="p.sprite" [alt]="p.name" class="item-sprite" loading="lazy" />
               <div class="item-info">
                 <span class="item-name">{{ p.name | titlecase }}</span>
                 <span class="item-id">#{{ p.id.toString().padStart(3, '0') }}</span>
               </div>
-              <div class="item-types">
-                @for (type of p.types; track type) {
-                  @let color = type | typeColor;
-                  <span
-                    class="mini-type-badge"
-                    [style.backgroundColor]="color.bg"
-                    [style.color]="color.text">
-                    {{ type | uppercase }}
-                  </span>
+              <div class="item-badges">
+                @if (inTeam) {
+                  <span class="in-team-badge">In Team</span>
                 }
+                <div class="item-types">
+                  @for (type of p.types; track type) {
+                    @let color = type | typeColor;
+                    <span
+                      class="mini-type-badge"
+                      [style.backgroundColor]="color.bg"
+                      [style.color]="color.text">
+                      {{ type | uppercase }}
+                    </span>
+                  }
+                </div>
               </div>
             </div>
           }
@@ -133,8 +153,13 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
     .dropdown-item:last-child {
       border-bottom: none;
     }
-    .dropdown-item:hover {
+    .dropdown-item:hover:not(.item-disabled) {
       background: #f8fafc;
+    }
+    .dropdown-item.item-disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      background: #fcfcfc;
     }
     .item-sprite {
       width: 38px;
@@ -155,6 +180,20 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
       font-size: 0.78rem;
       color: #94a3b8;
     }
+    .item-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .in-team-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
     .item-types {
       display: flex;
       gap: 4px;
@@ -168,33 +207,64 @@ import { TypeColorPipe } from '../../../shared/pipes/type-color.pipe';
   `]
 })
 export class PokemonAutocompleteComponent {
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly searchStream$ = new Subject<string>();
+
   public readonly availablePokemons = input<Pokemon[]>([]);
+  public readonly selectedMemberIds = input<number[]>([]);
   public readonly disabled = input<boolean>(false);
 
   public readonly selectPokemon = output<Pokemon>();
 
-  public readonly query = signal<string>('');
+  public readonly inputVal = signal<string>('');
+  public readonly debouncedQuery = signal<string>('');
   public readonly isOpen = signal<boolean>(false);
 
   public readonly filteredPokemons = computed(() => {
-    const q = this.query().trim().toLowerCase();
+    const q = this.debouncedQuery().trim().toLowerCase();
     const list = this.availablePokemons();
     if (!q) return list.slice(0, 8);
     return list.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
   });
 
-  onQueryChange(value: string): void {
-    this.query.set(value);
-    this.isOpen.set(true);
+  constructor() {
+    this.searchStream$
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(term => {
+        this.debouncedQuery.set(term);
+        this.isOpen.set(true);
+      });
+  }
+
+  public isAlreadyInTeam(pokemonId: number): boolean {
+    return this.selectedMemberIds().includes(pokemonId);
+  }
+
+  onQueryInput(value: string): void {
+    this.inputVal.set(value);
+    this.searchStream$.next(value);
+  }
+
+  onInputFocus(): void {
+    if (!this.disabled()) {
+      this.isOpen.set(true);
+    }
   }
 
   onSelect(p: Pokemon): void {
+    if (this.isAlreadyInTeam(p.id)) return;
     this.selectPokemon.emit(p);
     this.clearQuery();
   }
 
   clearQuery(): void {
-    this.query.set('');
+    this.inputVal.set('');
+    this.debouncedQuery.set('');
+    this.searchStream$.next('');
     this.isOpen.set(false);
   }
 }

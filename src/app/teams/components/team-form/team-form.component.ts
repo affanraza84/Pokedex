@@ -9,6 +9,7 @@ import {
   effect
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { toSignal } from '@angular/core/rxjs-interop';
 import {
   FormGroup,
   FormControl,
@@ -85,8 +86,16 @@ import { TeamChipsComponent } from '../team-chips/team-chips.component';
           <label class="form-label">Select Pokémon</label>
           <app-pokemon-autocomplete
             [availablePokemons]="availablePokemons()"
+            [selectedMemberIds]="selectedMemberIds()"
             [disabled]="selectedMembers().length >= 6"
             (selectPokemon)="onAddMember($event)" />
+
+          <!-- Duplicate Pokémon prevention error -->
+          @if (duplicateError(); as dupMsg) {
+            <div class="error-messages" role="alert">
+              <span class="error-text">⚠️ {{ dupMsg }}</span>
+            </div>
+          }
         </div>
 
         <!-- Selected Members Chips -->
@@ -258,6 +267,11 @@ export class TeamFormComponent {
 
   public readonly selectedMembers = signal<TeamMember[]>([]);
   public readonly membersTouched = signal<boolean>(false);
+  public readonly duplicateError = signal<string | null>(null);
+
+  public readonly selectedMemberIds = computed<number[]>(() => {
+    return this.selectedMembers().map(m => m.id);
+  });
 
   // Reactive Form definition
   public readonly teamForm = new FormGroup({
@@ -270,6 +284,11 @@ export class TeamFormComponent {
       ],
       asyncValidators: [uniqueTeamNameValidator(this.teamStore)]
     })
+  });
+
+  // Reactive bridge from Reactive Forms statusChanges to Angular Signal
+  private readonly formStatus = toSignal(this.teamForm.statusChanges, {
+    initialValue: this.teamForm.status
   });
 
   get nameControl(): FormControl<string> {
@@ -292,11 +311,21 @@ export class TeamFormComponent {
   });
 
   public isFormReadyToSubmit = computed(() => {
-    return this.teamForm.valid && this.isTeamSizeValid() && !this.nameControl.pending;
+    const status = this.formStatus();
+    return (status === 'VALID' || this.teamForm.valid) && this.isTeamSizeValid() && !this.nameControl.pending;
   });
 
   onAddMember(pokemon: Pokemon): void {
     if (this.selectedMembers().length >= 6) return;
+
+    // Prevent duplicate Pokémon in the same team
+    const isDuplicate = this.selectedMembers().some(m => m.id === pokemon.id);
+    if (isDuplicate) {
+      this.duplicateError.set(`"${pokemon.name}" is already in this team. Duplicate Pokémon are not allowed.`);
+      return;
+    }
+
+    this.duplicateError.set(null);
 
     const newMember: TeamMember = {
       id: pokemon.id,
@@ -313,6 +342,7 @@ export class TeamFormComponent {
   }
 
   onRemoveMember(index: number): void {
+    this.duplicateError.set(null);
     const updated = this.selectedMembers().filter((_, i) => i !== index);
     this.selectedMembers.set(updated);
     this.membersTouched.set(true);
@@ -329,11 +359,16 @@ export class TeamFormComponent {
     const pokemons = this.selectedMembers();
 
     this.teamSubmitted.emit({ name, pokemons });
+  }
 
-    // Reset form after submit
+  /**
+   * Resets the form and member selection after successful team creation.
+   */
+  public resetForm(): void {
     this.teamForm.reset();
     this.selectedMembers.set([]);
     this.membersTouched.set(false);
+    this.duplicateError.set(null);
     this.membersChanged.emit([]);
   }
 }

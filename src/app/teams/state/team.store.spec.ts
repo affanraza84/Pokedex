@@ -118,4 +118,35 @@ describe('TeamStore (Optimistic Creation & Rollback)', () => {
     expect(store.isNameTaken('EXISTING ALPHA')).toBe(true);
     expect(store.isNameTaken('New Brand Name')).toBe(false);
   });
+
+  it('should trigger onSuccess callback only upon server confirmation and onError upon failure', () => {
+    let successCalled = false;
+    let errorCalled = false;
+
+    mockApiService.createTeam = (input: TeamInput) =>
+      of({ id: 'server-confirmed-1', name: input.name, pokemons: [] });
+
+    store.createTeam(
+      { name: 'Success Squad', pokemons: [] },
+      () => { successCalled = true; },
+      () => { errorCalled = true; }
+    );
+
+    expect(successCalled).toBe(true);
+    expect(errorCalled).toBe(false);
+
+    // Test failure scenario
+    successCalled = false;
+    errorCalled = false;
+    mockApiService.createTeam = () => throwError(() => new Error('Server Mutation Aborted'));
+
+    store.createTeam(
+      { name: 'Fail Squad', pokemons: [] },
+      () => { successCalled = true; },
+      () => { errorCalled = true; }
+    );
+
+    expect(successCalled).toBe(false);
+    expect(errorCalled).toBe(true);
+  });
 });

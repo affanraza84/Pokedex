@@ -120,8 +120,14 @@ export class TeamStore {
    * If the server mutation fails, rolls back the update and exposes the error to the UI.
    *
    * @param input Name, members list, and optional trainer ID.
+   * @param onSuccess Optional callback invoked only after server confirms mutation.
+   * @param onError Optional callback invoked on mutation failure.
    */
-  public createTeam(input: TeamInput): void {
+  public createTeam(
+    input: TeamInput,
+    onSuccess?: (confirmedTeam: Team) => void,
+    onError?: (error: Error) => void
+  ): void {
     const previousTeams = [...this.state$.getValue().teams];
     const tempId = `optimistic-${Date.now()}`;
 
@@ -163,6 +169,8 @@ export class TeamStore {
               type: 'success'
             }
           });
+
+          onSuccess?.(serverConfirmedTeam);
         }),
         catchError(err => {
           console.error('[TeamStore] Server mutation failed. Performing optimistic rollback!', err);
@@ -178,6 +186,8 @@ export class TeamStore {
               type: 'error'
             }
           });
+
+          onError?.(err instanceof Error ? err : new Error(errorMessage));
           return of(null);
         }),
         takeUntilDestroyed(this.destroyRef)
